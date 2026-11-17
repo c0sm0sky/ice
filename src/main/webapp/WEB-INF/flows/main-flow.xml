@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<flow xmlns="http://www.springframework.org/schema/webflow"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.springframework.org/schema/webflow http://www.springframework.org/schema/webflow/spring-webflow-1.0.xsd">
+  <var name="userBean" scope="flow"/>
+
+  <start-actions>
+    <bean-action bean="userBean" method="getCurrentPageView">
+      <method-result name="view" scope="flow"/>
+    </bean-action>
+  </start-actions>
+
+  <start-state idref="entry"/>
+  <view-state id="entry" view="${flowScope.view}">
+    <transition on="login" to="loginDecision"/>
+    <transition on="editUser" to="editUser"/>
+    <transition on="logout" to="login"/>
+    <transition on="saveUser" to="users"/>
+    <transition on="saveUserError" to="editUser"/>
+    <transition on="cancelUserEdit" to="users"/>
+  </view-state>
+  <view-state id="login" view="/login.xhtml">
+    <transition on="login" to="loginDecision"/>
+  </view-state>
+  <decision-state id="loginDecision">
+    <if test="${flowScope.userBean.loggedIn}" then="users" else="login"/>
+  </decision-state>
+
+  <view-state id="users" view="/strona1.xhtml">
+    <transition on="editUser" to="editUser"/>
+    <transition on="logout" to="login"/>
+  </view-state>
+
+  <view-state id="editUser" view="/strona2.xhtml">
+    <transition on="saveUser" to="users"/>
+    <transition on="saveUserError" to="editUser"/>
+    <transition on="cancelUserEdit" to="users"/>
+  </view-state>
+</flow>

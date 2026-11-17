@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition xmlns:ice="http://www.icesoft.com/icefaces/component"
+                xmlns:ui="http://java.sun.com/jsf/facelets"
+                template="/WEB-INF/layouts/mainTemplate.xhtml">
+  <ui:define name="title">Ice | Logowanie</ui:define>
+  <ui:define name="mainPanel">
+    <div class="login-page">
+        <main class="login-card">
+          <h1>Zaloguj się</h1>
+            <ice:messages styleClass="messages" globalOnly="true"/>
+            <ice:outputText value="#{userBean.message}" styleClass="error"/>
+            <div class="field">
+              <ice:outputLabel for="user" value="Login"/>
+              <ice:inputText id="user" value="#{userBean.login}" styleClass="input"
+                             onkeypress="return submitLoginOnEnter(event);"/>
+            </div>
+            <div class="field">
+              <ice:outputLabel for="pass" value="Hasło"/>
+              <ice:inputSecret id="pass" value="#{userBean.haslo}" styleClass="input" redisplay="false"
+                               onkeypress="return submitLoginOnEnter(event);"/>
+            </div>
+            <ice:commandLink id="loginAction" value="Zaloguj się" action="#{userBean.login}" styleClass="primary full"/>
+            <script type="text/javascript">
+              function submitLoginOnEnter(event) {
+                var keyCode = event ? event.keyCode : window.event.keyCode;
+                if (keyCode !== 13) return true;
+                var loginAction = document.getElementById('mainForm:loginAction');
+                if (loginAction) loginAction.click();
+                return false;
+              }
+            </script>
+        </main>
+    </div>
+  </ui:define>
+</ui:composition>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition xmlns:ice="http://www.icesoft.com/icefaces/component"
+                xmlns:ui="http://java.sun.com/jsf/facelets"
+                template="/WEB-INF/layouts/mainTemplate.xhtml">
+  <ui:define name="title">Ice | Edycja użytkownika</ui:define>
+  <ui:define name="mainPanel">
+    <div class="login-page">
+      <main class="login-card">
+        <p class="eyebrow">UŻYTKOWNICY</p>
+        <h1>Edycja użytkownika</h1>
+        <ice:outputText value="#{userBean.message}" styleClass="error" rendered="#{userBean.message != null}"/>
+        <div class="field">
+          <ice:outputLabel for="password" value="Hasło"/>
+          <ice:inputText id="password" value="#{userBean.editUserPassword}" styleClass="input"/>
+        </div>
+        <div class="user-actions">
+          <ice:commandButton value="Zapisz" action="#{userBean.saveUser}" styleClass="primary"/>
+          <ice:commandButton value="Anuluj" action="#{userBean.cancelUserEdit}" styleClass="secondary" immediate="true"/>
+        </div>
+      </main>
+    </div>
+  </ui:define>
+</ui:composition>

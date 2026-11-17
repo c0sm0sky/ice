@@ -1,0 +1,36 @@
+name: Build WAR
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  war:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+
+      - name: Install Maven 2.2.1
+        run: |
+          curl --fail --silent --show-error --location \
+            https://archive.apache.org/dist/maven/maven-2/2.2.1/binaries/apache-maven-2.2.1-bin.tar.gz \
+            --output "$RUNNER_TEMP/apache-maven-2.2.1-bin.tar.gz"
+          tar -xzf "$RUNNER_TEMP/apache-maven-2.2.1-bin.tar.gz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/apache-maven-2.2.1/bin" >> "$GITHUB_PATH"
+
+      - name: Build WAR
+        env:
+          MAVEN_OPTS: -Dhttps.protocols=TLSv1.2
+        run: mvn clean package -DskipTests

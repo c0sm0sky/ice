@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<f:view xmlns:f="http://java.sun.com/jsf/core"
+        xmlns:ice="http://www.icesoft.com/icefaces/component"
+        xmlns:ui="http://java.sun.com/jsf/facelets">
+  <html>
+    <head>
+      <title><ui:insert name="title">Ice</ui:insert></title>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+      <meta name="viewport" content="width=device-width, initial-scale=1"/>
+      <ice:outputStyle href="./resources/css/ice.css"/>
+    </head>
+    <body>
+      <ice:form id="mainForm">
+        <ui:insert name="mainPanel"/>
+      </ice:form>
+    </body>
+  </html>
+</f:view>

@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="http://java.sun.com/xml/ns/javaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd"
+         version="2.5">
+  <display-name>Ice</display-name>
+
+  <context-param>
+    <param-name>javax.faces.DEFAULT_SUFFIX</param-name>
+    <param-value>.xhtml</param-value>
+  </context-param>
+  <context-param>
+    <param-name>com.icesoft.faces.actionURLSuffix</param-name>
+    <param-value>.iface</param-value>
+  </context-param>
+  <context-param>
+    <param-name>com.icesoft.faces.synchronousUpdate</param-name>
+    <param-value>true</param-value>
+  </context-param>
+  <context-param>
+    <param-name>contextConfigLocation</param-name>
+    <param-value>/WEB-INF/applicationContext.xml</param-value>
+  </context-param>
+
+  <listener>
+    <listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+  </listener>
+  <listener>
+    <listener-class>org.springframework.web.context.request.RequestContextListener</listener-class>
+  </listener>
+  <listener>
+    <listener-class>com.icesoft.faces.util.event.servlet.ContextEventRepeater</listener-class>
+  </listener>
+
+  <filter>
+    <filter-name>Spring Web Flow Cleanup</filter-name>
+    <filter-class>org.springframework.webflow.executor.jsf.FlowSystemCleanupFilter</filter-class>
+  </filter>
+  <filter-mapping>
+    <filter-name>Spring Web Flow Cleanup</filter-name>
+    <url-pattern>/*</url-pattern>
+  </filter-mapping>
+  <filter>
+    <filter-name>Root Flow Entry</filter-name>
+    <filter-class>pl.demo.ice.web.RootFlowEntryFilter</filter-class>
+  </filter>
+  <filter-mapping>
+    <filter-name>Root Flow Entry</filter-name>
+    <url-pattern>/*</url-pattern>
+  </filter-mapping>
+
+  <servlet>
+    <servlet-name>Faces Servlet</servlet-name>
+    <servlet-class>javax.faces.webapp.FacesServlet</servlet-class>
+    <load-on-startup>1</load-on-startup>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>Faces Servlet</servlet-name>
+    <url-pattern>*.faces</url-pattern>
+  </servlet-mapping>
+
+  <servlet>
+    <servlet-name>Persistent Faces Servlet</servlet-name>
+    <servlet-class>com.icesoft.faces.webapp.xmlhttp.PersistentFacesServlet</servlet-class>
+    <load-on-startup>1</load-on-startup>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>Persistent Faces Servlet</servlet-name>
+    <url-pattern>*.iface</url-pattern>
+  </servlet-mapping>
+  <servlet-mapping>
+    <servlet-name>Persistent Faces Servlet</servlet-name>
+    <url-pattern>/xmlhttp/*</url-pattern>
+  </servlet-mapping>
+
+  <servlet>
+    <servlet-name>Blocking Servlet</servlet-name>
+    <servlet-class>com.icesoft.faces.webapp.xmlhttp.BlockingServlet</servlet-class>
+    <load-on-startup>1</load-on-startup>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>Blocking Servlet</servlet-name>
+    <url-pattern>/block/*</url-pattern>
+  </servlet-mapping>
+
+  <session-config><session-timeout>30</session-timeout></session-config>
+</web-app>

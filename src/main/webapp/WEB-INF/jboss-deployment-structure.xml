@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jboss-deployment-structure xmlns="urn:jboss:deployment-structure:1.2">
+  <deployment>
+    <exclude-subsystems>
+      <subsystem name="jsf"/>
+    </exclude-subsystems>
+    <exclusions>
+      <module name="javax.faces.api"/>
+      <module name="javax.persistence.api"/>
+      <module name="org.jboss.as.jsf"/>
+      <module name="com.sun.jsf-impl"/>
+      <module name="org.hibernate"/>
+    </exclusions>
+  </deployment>
+</jboss-deployment-structure>

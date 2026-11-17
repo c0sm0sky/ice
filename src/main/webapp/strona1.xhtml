@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition xmlns:f="http://java.sun.com/jsf/core"
+                xmlns:ice="http://www.icesoft.com/icefaces/component"
+                xmlns:ui="http://java.sun.com/jsf/facelets"
+                template="/WEB-INF/layouts/mainTemplate.xhtml">
+  <ui:define name="title">Ice | Użytkownicy</ui:define>
+  <ui:define name="mainPanel">
+    <div class="layout">
+      <div class="main-content">
+        <div class="topbar">
+          <div><span class="muted">Workspace</span><b> / Użytkownicy</b></div>
+          <div class="top-user">
+            <b><ice:outputText value="#{userBean.loggedInName}"/></b>
+            <ice:commandLink value="Wyloguj" action="#{userBean.logout}" styleClass="action-link"/>
+          </div>
+        </div>
+        <div class="content">
+          <h1>Użytkownicy</h1>
+          <ice:outputText value="#{userBean.message}" styleClass="notice" rendered="#{userBean.message != null}"/>
+          <table class="user-table">
+            <thead>
+              <tr><th>Login</th><th>Imię</th><th>Nazwisko</th><th>Edycja</th></tr>
+            </thead>
+            <tbody>
+            <ui:repeat value="#{userBean.users}" var="user">
+              <tr>
+                <td><ice:outputText value="#{user.login}"/></td>
+                <td><ice:outputText value="#{user.imie}"/></td>
+                <td><ice:outputText value="#{user.nazwisko}"/></td>
+                <td>
+                  <ice:commandLink value="Edycja" action="#{userBean.editUser}" styleClass="action-link">
+                    <f:param name="userLogin" value="#{user.login}"/>
+                  </ice:commandLink>
+                </td>
+              </tr>
+            </ui:repeat>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </ui:define>
+</ui:composition>
