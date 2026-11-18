@@ -34,10 +34,10 @@ MAVEN_OPTS="-Dhttps.protocols=TLSv1.2" mvn clean package
 Wdróż aplikację:
 
 ```sh
-cp target/ice.war "$WILDFLY_HOME/standalone/deployments/"
+cp target/prime.war "$WILDFLY_HOME/standalone/deployments/"
 ```
 
-Otwórz `http://localhost:8080/ice/`. Konto demonstracyjne: `admin` / `admin`.
+Otwórz `http://localhost:8080/prime/`. Konto demonstracyjne: `admin` / `admin`.
 
 Konfigurację PostgreSQL można nadpisać właściwościami systemowymi:
 
@@ -56,3 +56,14 @@ Widoki `login.xhtml`, `strona1.xhtml` i `strona2.xhtml` są klientami Facelets w
 Tabela `users` przechowuje `id`, `login`, `haslo`, `imie` i `nazwisko`; hasło jest przechowywane jako tekst jawny. Aby uruchomić PostgreSQL od zera, wykonaj `docker compose down -v`, a potem `docker compose up -d postgres`.
 
 Plik `WEB-INF/jboss-deployment-structure.xml` wyłącza integrację JSF WildFly dla tej aplikacji, aby ładować do WAR-a wymagany JSF 1.1 zamiast serwerowego JSF 2.3.
+
+## Eksperymentalna migracja ICEfaces do PrimeFaces
+Migracja jest odtwarzalna i nie zmienia źródłowego wariantu ICE. Wersje docelowe znajdują się w sekcji `<properties>` pliku `pom.xml` jako `migration.*`; recepty OpenRewrite są w `rewrite.yml`.
+
+Profil wymaga JDK 25 i Maven 3.6.3 lub nowszego. Buduje zmigrowaną kopię w `target`, pozostawiając źródła ICE bez zmian:
+
+```sh
+mvn clean install -P primefaces-migration
+```
+
+Wynikiem jest `target/prime.war`, bez ICEfaces i MyFaces, gotowy do wdrożenia na WildFly 42 z Java 25. `clean package` również buduje WAR; `install` dodatkowo instaluje artefakt w lokalnym repozytorium Maven.
