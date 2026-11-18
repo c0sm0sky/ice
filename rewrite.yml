@@ -8,6 +8,8 @@ recipeList:
   - pl.demo.ice.migrate.IceComponentsToPrimeFaces
   - pl.demo.ice.migrate.IceDependenciesToPrimeFaces
   - pl.demo.ice.migrate.UpgradeBackendForWildFly42
+  - pl.demo.ice.migrate.CleanUpUpgradedWebFlowFor4
+  - pl.demo.ice.migrate.UseAuthenticationDecisionAsWebFlowEntry
   - pl.demo.ice.migrate.RemoveLegacyFacesConfiguration
 ---
 type: specs.openrewrite.org/v1beta/recipe
@@ -353,48 +355,6 @@ recipeList:
       replace: ''
       filePattern: src/main/java/pl/demo/ice/web/RootFlowEntryFilter.java
 
-  # src/main/webapp/WEB-INF/flows/main-flow.xml
-  - org.openrewrite.text.FindAndReplace:
-      find: 'http://www.springframework.org/schema/webflow/spring-webflow-1.0.xsd'
-      replace: 'https://www.springframework.org/schema/webflow/spring-webflow.xsd'
-      filePattern: src/main/webapp/WEB-INF/flows/main-flow.xml
-  - org.openrewrite.text.FindAndReplace:
-      find: '<var name="userBean" scope="flow"/>'
-      replace: ''
-      filePattern: src/main/webapp/WEB-INF/flows/main-flow.xml
-  - org.openrewrite.text.FindAndReplace:
-      find: |-
-        <start-actions>
-            <bean-action bean="userBean" method="getCurrentPageView">
-              <method-result name="view" scope="flow"/>
-            </bean-action>
-          </start-actions>
-      replace: ''
-      filePattern: src/main/webapp/WEB-INF/flows/main-flow.xml
-  - org.openrewrite.text.FindAndReplace:
-      find: '<start-state idref="entry"/>'
-      replace: ''
-      filePattern: src/main/webapp/WEB-INF/flows/main-flow.xml
-  - org.openrewrite.text.FindAndReplace:
-      find: 'xsi:schemaLocation="http://www.springframework.org/schema/webflow https://www.springframework.org/schema/webflow/spring-webflow.xsd">'
-      replace: 'xsi:schemaLocation="http://www.springframework.org/schema/webflow https://www.springframework.org/schema/webflow/spring-webflow.xsd" start-state="entry">'
-      filePattern: src/main/webapp/WEB-INF/flows/main-flow.xml
-  - org.openrewrite.text.FindAndReplace:
-      find: '(?s)<view-state id="entry" view="\$\{flowScope\.view\}">.*?</view-state>'
-      replace: |-
-        <decision-state id="entry">
-            <if test="userBean.currentPageView == '/strona2.xhtml'" then="editUser" else="pageDecision"/>
-          </decision-state>
-          <decision-state id="pageDecision">
-            <if test="userBean.currentPageView == '/strona1.xhtml'" then="users" else="loginDecision"/>
-          </decision-state>
-      regex: true
-      filePattern: src/main/webapp/WEB-INF/flows/main-flow.xml
-  - org.openrewrite.text.FindAndReplace:
-      find: '<if test="${flowScope.userBean.loggedIn}" then="users" else="login"/>'
-      replace: '<if test="userBean.loggedIn" then="users" else="login"/>'
-      filePattern: src/main/webapp/WEB-INF/flows/main-flow.xml
-
   # src/main/java/pl/demo/ice/web/RootFlowUrlHandler.java (flow URL support)
   - org.openrewrite.text.CreateTextFile:
       relativeFileName: src/main/java/pl/demo/ice/web/RootFlowUrlHandler.java
@@ -436,6 +396,42 @@ recipeList:
             }
         }
       overwriteExisting: false
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: pl.demo.ice.migrate.CleanUpUpgradedWebFlowFor4
+displayName: Remove obsolete flow startup scaffolding and adapt bean references for Web Flow 4
+preconditions:
+  - org.openrewrite.FindSourceFiles:
+      filePattern: src/main/webapp/WEB-INF/flows/main-flow.xml
+recipeList:
+  # The upgrader omits class on this legacy flow variable; userBean is a Spring session bean.
+  - org.openrewrite.xml.RemoveXmlTag:
+      xPath: //webflow:var[@name='userBean']
+  # This action only initialized flowScope.view for the legacy dynamic entry view.
+  - org.openrewrite.xml.RemoveXmlTag:
+      xPath: //webflow:on-start
+  # Resolve the session-scoped Spring bean directly after removing its flow variable.
+  - org.openrewrite.xml.ChangeTagAttribute:
+      elementName: //webflow:if[@test='flowScope.userBean.loggedIn']
+      attributeName: test
+      oldValue: flowScope.userBean.loggedIn
+      newValue: userBean.loggedIn
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: pl.demo.ice.migrate.UseAuthenticationDecisionAsWebFlowEntry
+displayName: Start migrated flow at the existing authentication decision
+preconditions:
+  - org.openrewrite.FindSourceFiles:
+      filePattern: src/main/webapp/WEB-INF/flows/main-flow.xml
+recipeList:
+  # Resume active executions by key; new executions start at the existing authentication decision.
+  - org.openrewrite.xml.ChangeTagAttribute:
+      elementName: /webflow:flow
+      attributeName: start-state
+      oldValue: entry
+      newValue: loginDecision
+  - org.openrewrite.xml.RemoveXmlTag:
+      xPath: //webflow:view-state[@id='entry']
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: pl.demo.ice.migrate.RemoveLegacyFacesConfiguration
@@ -485,6 +481,9 @@ recipeList:
 type: specs.openrewrite.org/v1beta/recipe
 name: pl.demo.ice.migrate.IceComponentsToPrimeFaces
 displayName: Replace used ICEfaces XHTML components
+preconditions:
+  - org.openrewrite.FindSourceFiles:
+      filePattern: src/main/webapp/**/*.xhtml
 recipeList:
 
   # Shared Facelets namespaces and ICEfaces component conversion across XHTML files
@@ -492,137 +491,120 @@ recipeList:
       elementName: //f:view
       attributeName: xmlns:h
       newValue: jakarta.faces.html
-      filePattern: src/main/webapp/**/*.xhtml
   - org.openrewrite.xml.AddTagAttribute:
       elementName: //ui:composition
       attributeName: xmlns:h
       newValue: jakarta.faces.html
-      filePattern: src/main/webapp/**/*.xhtml
   - org.openrewrite.xml.ChangeTagAttribute:
       elementName: //f:view
       attributeName: xmlns:ui
       oldValue: http://java.sun.com/jsf/facelets
       newValue: jakarta.faces.facelets
-      filePattern: src/main/webapp/**/*.xhtml
   - org.openrewrite.xml.ChangeTagAttribute:
       elementName: //ui:composition
       attributeName: xmlns:ui
       oldValue: http://java.sun.com/jsf/facelets
       newValue: jakarta.faces.facelets
-      filePattern: src/main/webapp/**/*.xhtml
   - org.openrewrite.xml.ChangeTagAttribute:
       elementName: //f:view
       attributeName: xmlns:f
       oldValue: http://java.sun.com/jsf/core
       newValue: jakarta.faces.core
-      filePattern: src/main/webapp/**/*.xhtml
   - org.openrewrite.xml.ChangeTagAttribute:
       elementName: //ui:composition
       attributeName: xmlns:f
       oldValue: http://java.sun.com/jsf/core
       newValue: jakarta.faces.core
-      filePattern: src/main/webapp/**/*.xhtml
   - org.openrewrite.xml.ChangeTagAttributeKey:
       xPath: //@xmlns:ice
       newAttributeName: xmlns:p
-      filePattern: src/main/webapp/**/*.xhtml
   - org.openrewrite.xml.ChangeTagAttribute:
       elementName: //f:view
       attributeName: xmlns:p
       oldValue: http://www.icesoft.com/icefaces/component
       newValue: http://primefaces.org/ui
-      filePattern: src/main/webapp/**/*.xhtml
   - org.openrewrite.xml.ChangeTagAttribute:
       elementName: //ui:composition
       attributeName: xmlns:p
       oldValue: http://www.icesoft.com/icefaces/component
       newValue: http://primefaces.org/ui
-      filePattern: src/main/webapp/**/*.xhtml
 
   # Global tag-name substitutions
   - org.openrewrite.xml.ChangeTagName:
       elementName: //head
       newName: h:head
-      filePattern: src/main/webapp/**/*.xhtml
   - org.openrewrite.xml.ChangeTagName:
       elementName: //body
       newName: h:body
-      filePattern: src/main/webapp/**/*.xhtml
   - org.openrewrite.xml.ChangeTagName:
       elementName: //ice:form
       newName: h:form
-      filePattern: src/main/webapp/**/*.xhtml
   - org.openrewrite.xml.ChangeTagName:
       elementName: //ice:inputText
       newName: p:inputText
-      filePattern: src/main/webapp/**/*.xhtml
   - org.openrewrite.xml.ChangeTagName:
       elementName: //ice:inputSecret
       newName: p:password
-      filePattern: src/main/webapp/**/*.xhtml
   - org.openrewrite.xml.ChangeTagName:
       elementName: //ice:commandLink
       newName: p:commandLink
-      filePattern: src/main/webapp/**/*.xhtml
   - org.openrewrite.xml.ChangeTagName:
       elementName: //ice:commandButton
       newName: p:commandButton
-      filePattern: src/main/webapp/**/*.xhtml
   - org.openrewrite.xml.ChangeTagName:
       elementName: //ice:messages
       newName: p:messages
-      filePattern: src/main/webapp/**/*.xhtml
   - org.openrewrite.xml.ChangeTagName:
       elementName: //ice:outputLabel
       newName: p:outputLabel
-      filePattern: src/main/webapp/**/*.xhtml
   - org.openrewrite.xml.ChangeTagName:
       elementName: //ice:outputText
       newName: h:outputText
-      filePattern: src/main/webapp/**/*.xhtml
   - org.openrewrite.xml.ChangeTagName:
       elementName: //ice:outputStyle
       newName: h:outputStylesheet
-      filePattern: src/main/webapp/**/*.xhtml
 
   # Preserve AJAX processing and rendering for every migrated action component
   - org.openrewrite.xml.AddTagAttribute:
       elementName: //p:commandLink
       attributeName: process
       newValue: '@form'
-      filePattern: src/main/webapp/**/*.xhtml
   - org.openrewrite.xml.AddTagAttribute:
       elementName: //p:commandLink
       attributeName: update
       newValue: '@form'
-      filePattern: src/main/webapp/**/*.xhtml
   - org.openrewrite.xml.AddTagAttribute:
       elementName: //p:commandButton
       attributeName: process
       newValue: '@form'
-      filePattern: src/main/webapp/**/*.xhtml
   - org.openrewrite.xml.AddTagAttribute:
       elementName: //p:commandButton
       attributeName: update
       newValue: '@form'
-      filePattern: src/main/webapp/**/*.xhtml
 
-  # Keep the template stylesheet mapped to its JSF resource library
+  - pl.demo.ice.migrate.PrimeFacesStylesheetToResourceLibrary
+
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: pl.demo.ice.migrate.PrimeFacesStylesheetToResourceLibrary
+displayName: Update the template stylesheet to use the JSF resource library
+preconditions:
+  - org.openrewrite.FindSourceFiles:
+      filePattern: src/main/webapp/WEB-INF/layouts/mainTemplate.xhtml
+recipeList:
   - org.openrewrite.xml.ChangeTagAttributeKey:
       xPath: //h:outputStylesheet/@href
       newAttributeName: name
-      filePattern: src/main/webapp/WEB-INF/layouts/mainTemplate.xhtml
   - org.openrewrite.xml.ChangeTagAttribute:
       elementName: //h:outputStylesheet
       attributeName: name
       oldValue: ./resources/css/ice.css
       newValue: ice.css
-      filePattern: src/main/webapp/WEB-INF/layouts/mainTemplate.xhtml
   - org.openrewrite.xml.AddTagAttribute:
       elementName: //h:outputStylesheet
       attributeName: library
       newValue: css
-      filePattern: src/main/webapp/WEB-INF/layouts/mainTemplate.xhtml
+
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: pl.demo.ice.migrate.IceDependenciesToPrimeFaces

@@ -34,6 +34,8 @@
     <migration.maven-war-plugin.version>3.5.1</migration.maven-war-plugin.version>
     <migration.maven-clean-plugin.version>3.5.0</migration.maven-clean-plugin.version>
     <migration.maven-install-plugin.version>3.1.4</migration.maven-install-plugin.version>
+    <migration.maven-dependency-plugin.version>3.11.0</migration.maven-dependency-plugin.version>
+    <migration.webflow-upgrader.version>2.0.6.RELEASE</migration.webflow-upgrader.version>
     <migration.rewrite-plugin.version>6.46.1</migration.rewrite-plugin.version>
     <migration.rewrite-migrate-java.version>3.42.1</migration.rewrite-migrate-java.version>
   </properties>
@@ -226,10 +228,11 @@
       <id>primefaces-migration</id>
       <properties>
         <rewrite.activeRecipes>pl.demo.ice.migrate.IceToPrimeFaces</rewrite.activeRecipes>
-        <rewrite.recipeArtifactCoordinates>org.openrewrite.recipe:rewrite-migrate-java:3.42.1</rewrite.recipeArtifactCoordinates>
+        <rewrite.recipeArtifactCoordinates>org.openrewrite.recipe:rewrite-migrate-java:${migration.rewrite-migrate-java.version}</rewrite.recipeArtifactCoordinates>
         <migration.junit.version>6.1.3</migration.junit.version>
         <migration.cdi.version>4.1.0</migration.cdi.version>
         <migration.maven-antrun-plugin.version>3.2.0</migration.maven-antrun-plugin.version>
+        <migration.maven-surefire-plugin.version>3.6.1</migration.maven-surefire-plugin.version>
         <primefaces.migration.staged>false</primefaces.migration.staged>
         <primefaces.migration.skip-local-compile>true</primefaces.migration.skip-local-compile>
         <primefaces.migration.skip-local-war>true</primefaces.migration.skip-local-war>
@@ -239,6 +242,12 @@
         <dependency>
           <groupId>org.junit.jupiter</groupId>
           <artifactId>junit-jupiter</artifactId>
+          <version>${migration.junit.version}</version>
+          <scope>test</scope>
+        </dependency>
+        <dependency>
+          <groupId>org.junit.vintage</groupId>
+          <artifactId>junit-vintage-engine</artifactId>
           <version>${migration.junit.version}</version>
           <scope>test</scope>
         </dependency>
@@ -264,6 +273,16 @@
       <build>
         <plugins>
           <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <version>${migration.maven-surefire-plugin.version}</version>
+            <configuration>
+              <includes>
+                <include>**/FlowMigrationRuntimeTest.java</include>
+              </includes>
+            </configuration>
+          </plugin>
+          <plugin>
             <groupId>org.codehaus.mojo</groupId>
             <artifactId>build-helper-maven-plugin</artifactId>
             <version>3.6.1</version>
@@ -274,6 +293,35 @@
                 <goals><goal>add-test-source</goal></goals>
                 <configuration>
                   <sources><source>src/test/primefaces-migration/java</source></sources>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-dependency-plugin</artifactId>
+            <version>${migration.maven-dependency-plugin.version}</version>
+            <executions>
+              <execution>
+                <id>prepare-webflow-upgrader</id>
+                <phase>initialize</phase>
+                <goals><goal>copy</goal></goals>
+                <configuration>
+                  <skip>${primefaces.migration.staged}</skip>
+                  <artifactItems>
+                    <artifactItem>
+                      <groupId>org.springframework.webflow</groupId>
+                      <artifactId>spring-webflow</artifactId>
+                      <version>${migration.webflow-upgrader.version}</version>
+                      <outputDirectory>${project.build.directory}/migration-tools</outputDirectory>
+                    </artifactItem>
+                    <artifactItem>
+                      <groupId>org.springframework</groupId>
+                      <artifactId>spring-core</artifactId>
+                      <version>${migration.spring.version}</version>
+                      <outputDirectory>${project.build.directory}/migration-tools</outputDirectory>
+                    </artifactItem>
+                  </artifactItems>
                 </configuration>
               </execution>
             </executions>
@@ -295,7 +343,8 @@
                 <configuration>
                   <skip>${primefaces.migration.staged}</skip>
                   <target>
-                    <property name="migration.work.dir" location="${project.build.directory}/primefaces-migration"/>
+                    <tempfile property="migration.work.dir" destDir="${java.io.tmpdir}"
+                              prefix="ice-primefaces-migration-" createFile="false"/>
                     <mkdir dir="${migration.work.dir}"/>
                     <copy todir="${migration.work.dir}">
                       <fileset dir="${project.basedir}">
@@ -304,24 +353,46 @@
                         <include name="src/**"/>
                       </fileset>
                     </copy>
-                    <exec executable="mvn" dir="${project.basedir}" failonerror="true">
+                    <mkdir dir="${migration.work.dir}/target"/>
+                    <java classname="org.springframework.webflow.upgrade.WebFlowUpgrader"
+                          fork="true" failonerror="true"
+                          output="${migration.work.dir}/target/main-flow-upgraded.xml">
+                      <classpath>
+                        <pathelement location="${project.build.directory}/migration-tools/spring-webflow-${migration.webflow-upgrader.version}.jar"/>
+                        <pathelement location="${project.build.directory}/migration-tools/spring-core-${migration.spring.version}.jar"/>
+                      </classpath>
+                      <arg value="${migration.work.dir}/src/main/webapp/WEB-INF/flows/main-flow.xml"/>
+                    </java>
+                    <move file="${migration.work.dir}/target/main-flow-upgraded.xml"
+                          tofile="${migration.work.dir}/src/main/webapp/WEB-INF/flows/main-flow.xml"
+                          overwrite="true"/>
+                    <exec executable="mvn" dir="${migration.work.dir}" failonerror="true">
+                      <arg value="-f"/>
+                      <arg value="${migration.work.dir}/pom.xml"/>
+                      <arg value="-Dmaven.multiModuleProjectDirectory=${migration.work.dir}"/>
                       <arg value="-Dprimefaces.migration.staged=true"/>
                       <arg value="-Pprimefaces-migration"/>
                       <arg value="rewrite:dryRunNoFork"/>
                     </exec>
+                    <mkdir dir="${project.build.directory}/rewrite"/>
+                    <copy file="${migration.work.dir}/target/rewrite/rewrite.patch"
+                          tofile="${project.build.directory}/rewrite/rewrite.patch" overwrite="true"/>
                     <exec executable="patch" dir="${migration.work.dir}" failonerror="true">
                       <arg value="--dry-run"/>
                       <arg value="-p1"/>
                       <arg value="-i"/>
-                      <arg value="${project.build.directory}/rewrite/rewrite.patch"/>
+                      <arg value="${migration.work.dir}/target/rewrite/rewrite.patch"/>
                     </exec>
                     <exec executable="patch" dir="${migration.work.dir}" failonerror="true">
                       <arg value="-p1"/>
                       <arg value="-i"/>
-                      <arg value="${project.build.directory}/rewrite/rewrite.patch"/>
+                      <arg value="${migration.work.dir}/target/rewrite/rewrite.patch"/>
                     </exec>
                     <delete file="${migration.work.dir}/src/main/webapp/WEB-INF/faces-config.xml"/>
                     <exec executable="mvn" dir="${migration.work.dir}" failonerror="true">
+                      <arg value="-f"/>
+                      <arg value="${migration.work.dir}/pom.xml"/>
+                      <arg value="-Dmaven.multiModuleProjectDirectory=${migration.work.dir}"/>
                       <arg value="-Dprimefaces.migration.staged=true"/>
                       <arg value="-Dprimefaces.migration.skip-local-compile=false"/>
                       <arg value="-Dprimefaces.migration.skip-local-war=false"/>
@@ -332,6 +403,7 @@
                     </exec>
                     <copy file="${migration.work.dir}/target/prime.war"
                           tofile="${project.build.directory}/prime.war" overwrite="true"/>
+                    <delete dir="${migration.work.dir}" quiet="true"/>
                   </target>
                 </configuration>
               </execution>
