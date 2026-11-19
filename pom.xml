@@ -20,24 +20,12 @@
     <icefaces.version>1.8.2</icefaces.version>
     <myfaces.version>1.1.10</myfaces.version>
     <postgresql.version>42.7.5</postgresql.version>
-
-    <migration.java.version>25</migration.java.version>
-    <migration.primefaces.version>16.0.2</migration.primefaces.version>
-    <migration.spring.version>7.0.10</migration.spring.version>
-    <migration.spring-webflow.version>4.0.1</migration.spring-webflow.version>
-    <migration.hibernate.version>7.4.16.Final</migration.hibernate.version>
-    <migration.postgresql.version>42.7.14</migration.postgresql.version>
-    <migration.jakarta-faces.version>4.1.1</migration.jakarta-faces.version>
-    <migration.jakarta-servlet.version>6.1.0</migration.jakarta-servlet.version>
-    <migration.commons-dbcp.version>2.14.0</migration.commons-dbcp.version>
-    <migration.maven-compiler-plugin.version>3.14.1</migration.maven-compiler-plugin.version>
-    <migration.maven-war-plugin.version>3.5.1</migration.maven-war-plugin.version>
-    <migration.maven-clean-plugin.version>3.5.0</migration.maven-clean-plugin.version>
-    <migration.maven-install-plugin.version>3.1.4</migration.maven-install-plugin.version>
-    <migration.maven-dependency-plugin.version>3.11.0</migration.maven-dependency-plugin.version>
-    <migration.webflow-upgrader.version>2.0.6.RELEASE</migration.webflow-upgrader.version>
-    <migration.rewrite-plugin.version>6.46.1</migration.rewrite-plugin.version>
-    <migration.rewrite-migrate-java.version>3.42.1</migration.rewrite-migrate-java.version>
+    <servlet-api.version>2.5</servlet-api.version>
+    <javassist.version>3.12.0.GA</javassist.version>
+    <commons-dbcp.version>1.4</commons-dbcp.version>
+    <maven-clean-plugin.version>2.5</maven-clean-plugin.version>
+    <maven-compiler-plugin.version>2.3.2</maven-compiler-plugin.version>
+    <maven-war-plugin.version>2.1.1</maven-war-plugin.version>
   </properties>
 
   <repositories>
@@ -139,7 +127,7 @@
     <dependency>
       <groupId>javax.servlet</groupId>
       <artifactId>servlet-api</artifactId>
-      <version>2.5</version>
+      <version>${servlet-api.version}</version>
       <scope>provided</scope>
     </dependency>
 
@@ -179,12 +167,12 @@
     <dependency>
       <groupId>javassist</groupId>
       <artifactId>javassist</artifactId>
-      <version>3.12.0.GA</version>
+      <version>${javassist.version}</version>
     </dependency>
     <dependency>
       <groupId>commons-dbcp</groupId>
       <artifactId>commons-dbcp</artifactId>
-      <version>1.4</version>
+      <version>${commons-dbcp.version}</version>
     </dependency>
     <dependency>
       <groupId>org.postgresql</groupId>
@@ -195,17 +183,25 @@
   </dependencies>
 
   <build>
-    <finalName>prime</finalName>
+    <finalName>ice</finalName>
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-clean-plugin</artifactId>
-        <version>2.5</version>
+        <version>${maven-clean-plugin.version}</version>
+        <configuration>
+          <filesets>
+            <fileset>
+              <directory>${project.basedir}/primefaces-migrated.staging</directory>
+              <followSymlinks>false</followSymlinks>
+            </fileset>
+          </filesets>
+        </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>2.3.2</version>
+        <version>${maven-compiler-plugin.version}</version>
         <configuration>
           <source>1.8</source>
           <target>1.8</target>
@@ -215,7 +211,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-war-plugin</artifactId>
-        <version>2.1.1</version>
+        <version>${maven-war-plugin.version}</version>
         <configuration>
           <failOnMissingWebXml>true</failOnMissingWebXml>
         </configuration>
@@ -227,14 +223,36 @@
     <profile>
       <id>primefaces-migration</id>
       <properties>
+        <migration.java.version>25</migration.java.version>
+        <migration.primefaces.version>16.0.2</migration.primefaces.version>
+        <migration.spring.version>7.0.10</migration.spring.version>
+        <migration.spring-webflow.version>4.0.1</migration.spring-webflow.version>
+        <migration.hibernate.version>7.4.16.Final</migration.hibernate.version>
+        <migration.postgresql.version>42.7.14</migration.postgresql.version>
+        <migration.jakarta-faces.version>4.1.1</migration.jakarta-faces.version>
+        <migration.jakarta-servlet.version>6.1.0</migration.jakarta-servlet.version>
+        <migration.commons-dbcp.version>2.14.0</migration.commons-dbcp.version>
+        <migration.maven-compiler-plugin.version>3.14.1</migration.maven-compiler-plugin.version>
+        <migration.maven-war-plugin.version>3.5.1</migration.maven-war-plugin.version>
+        <migration.maven-clean-plugin.version>3.5.0</migration.maven-clean-plugin.version>
+        <migration.maven-install-plugin.version>3.1.4</migration.maven-install-plugin.version>
+        <migration.maven-dependency-plugin.version>3.11.0</migration.maven-dependency-plugin.version>
+        <migration.webflow-upgrader.version>2.0.6.RELEASE</migration.webflow-upgrader.version>
+        <migration.rewrite-plugin.version>6.46.1</migration.rewrite-plugin.version>
+        <migration.rewrite-migrate-java.version>3.42.1</migration.rewrite-migrate-java.version>
         <rewrite.activeRecipes>pl.demo.ice.migrate.IceToPrimeFaces</rewrite.activeRecipes>
         <rewrite.recipeArtifactCoordinates>org.openrewrite.recipe:rewrite-migrate-java:${migration.rewrite-migrate-java.version}</rewrite.recipeArtifactCoordinates>
         <migration.junit.version>6.1.3</migration.junit.version>
         <migration.cdi.version>4.1.0</migration.cdi.version>
         <migration.maven-antrun-plugin.version>3.2.0</migration.maven-antrun-plugin.version>
         <migration.maven-surefire-plugin.version>3.6.1</migration.maven-surefire-plugin.version>
+        <migration.maven-build-helper-plugin.version>3.6.1</migration.maven-build-helper-plugin.version>
+        <migration.maven-enforcer-plugin.version>1.0.1</migration.maven-enforcer-plugin.version>
+        <primefaces.migration.output.dir>${project.basedir}/primefaces-migrated</primefaces.migration.output.dir>
+        <primefaces.migration.staging.dir>${project.basedir}/primefaces-migrated.staging</primefaces.migration.staging.dir>
+        <primefaces.migration.backup.dir>${project.basedir}/primefaces-migrated.previous</primefaces.migration.backup.dir>
         <primefaces.migration.staged>false</primefaces.migration.staged>
-        <primefaces.migration.skip-local-compile>true</primefaces.migration.skip-local-compile>
+        <primefaces.migration.skip-local-compile>false</primefaces.migration.skip-local-compile>
         <primefaces.migration.skip-local-war>true</primefaces.migration.skip-local-war>
         <primefaces.migration.skip-local-install>true</primefaces.migration.skip-local-install>
       </properties>
@@ -278,14 +296,14 @@
             <version>${migration.maven-surefire-plugin.version}</version>
             <configuration>
               <includes>
-                <include>**/FlowMigrationRuntimeTest.java</include>
+                <include>**/FlowMigrationDefinitionTest.java</include>
               </includes>
             </configuration>
           </plugin>
           <plugin>
             <groupId>org.codehaus.mojo</groupId>
             <artifactId>build-helper-maven-plugin</artifactId>
-            <version>3.6.1</version>
+            <version>${migration.maven-build-helper-plugin.version}</version>
             <executions>
               <execution>
                 <id>add-primefaces-migration-tests</id>
@@ -347,13 +365,12 @@
                               prefix="ice-primefaces-migration-" createFile="false"/>
                     <mkdir dir="${migration.work.dir}"/>
                     <copy todir="${migration.work.dir}">
-                      <fileset dir="${project.basedir}">
-                        <include name="pom.xml"/>
-                        <include name="rewrite.yml"/>
-                        <include name="src/**"/>
-                      </fileset>
+                      <fileset dir="${project.basedir}"
+                               excludes="target/**,primefaces-migrated/**,.git/**,.idea/**"/>
                     </copy>
                     <mkdir dir="${migration.work.dir}/target"/>
+                    <mkdir dir="${project.build.directory}/migration-artifacts"/>
+                    <echo message="Running Spring WebFlowUpgrader on main-flow.xml"/>
                     <java classname="org.springframework.webflow.upgrade.WebFlowUpgrader"
                           fork="true" failonerror="true"
                           output="${migration.work.dir}/target/main-flow-upgraded.xml">
@@ -363,6 +380,9 @@
                       </classpath>
                       <arg value="${migration.work.dir}/src/main/webapp/WEB-INF/flows/main-flow.xml"/>
                     </java>
+                    <copy file="${migration.work.dir}/target/main-flow-upgraded.xml"
+                          tofile="${project.build.directory}/migration-artifacts/main-flow-upgraded.xml"/>
+                    <echo message="WebFlowUpgrader output retained at ${project.build.directory}/migration-artifacts/main-flow-upgraded.xml"/>
                     <move file="${migration.work.dir}/target/main-flow-upgraded.xml"
                           tofile="${migration.work.dir}/src/main/webapp/WEB-INF/flows/main-flow.xml"
                           overwrite="true"/>
@@ -388,21 +408,53 @@
                       <arg value="-i"/>
                       <arg value="${migration.work.dir}/target/rewrite/rewrite.patch"/>
                     </exec>
-                    <delete file="${migration.work.dir}/src/main/webapp/WEB-INF/faces-config.xml"/>
                     <exec executable="mvn" dir="${migration.work.dir}" failonerror="true">
                       <arg value="-f"/>
                       <arg value="${migration.work.dir}/pom.xml"/>
                       <arg value="-Dmaven.multiModuleProjectDirectory=${migration.work.dir}"/>
                       <arg value="-Dprimefaces.migration.staged=true"/>
-                      <arg value="-Dprimefaces.migration.skip-local-compile=false"/>
-                      <arg value="-Dprimefaces.migration.skip-local-war=false"/>
-                      <arg value="-Dprimefaces.migration.skip-local-install=false"/>
+                      <arg value="-Drewrite.activeRecipes=pl.demo.ice.migrate.PrimeFacesPomChanges"/>
                       <arg value="-Pprimefaces-migration"/>
-                      <arg value="clean"/>
-                      <arg value="install"/>
+                      <arg value="rewrite:dryRunNoFork"/>
                     </exec>
-                    <copy file="${migration.work.dir}/target/prime.war"
-                          tofile="${project.build.directory}/prime.war" overwrite="true"/>
+                    <copy file="${migration.work.dir}/target/rewrite/rewrite.patch"
+                          tofile="${project.build.directory}/rewrite/primefaces-pom-changes.patch" overwrite="true"/>
+                    <exec executable="patch" dir="${migration.work.dir}" failonerror="true">
+                      <arg value="--dry-run"/>
+                      <arg value="-p1"/>
+                      <arg value="-i"/>
+                      <arg value="${migration.work.dir}/target/rewrite/rewrite.patch"/>
+                    </exec>
+                    <exec executable="patch" dir="${migration.work.dir}" failonerror="true">
+                      <arg value="-p1"/>
+                      <arg value="-i"/>
+                      <arg value="${migration.work.dir}/target/rewrite/rewrite.patch"/>
+                    </exec>
+                    <exec executable="test" dir="${migration.work.dir}" failonerror="true">
+                      <arg value="!"/>
+                      <arg value="-s"/>
+                      <arg value="src/main/webapp/WEB-INF/faces-config.xml"/>
+                    </exec>
+                    <delete file="${migration.work.dir}/src/main/webapp/WEB-INF/faces-config.xml"/>
+                    <delete dir="${primefaces.migration.staging.dir}" quiet="true"/>
+                    <copy todir="${primefaces.migration.staging.dir}">
+                      <fileset dir="${migration.work.dir}"
+                               excludes="target/**,rewrite.yml,README.md,src/test/primefaces-migration/**"/>
+                    </copy>
+                    <exec executable="mvn" dir="${primefaces.migration.staging.dir}" failonerror="true">
+                      <arg value="-f"/>
+                      <arg value="${primefaces.migration.staging.dir}/pom.xml"/>
+                      <arg value="clean"/>
+                      <arg value="package"/>
+                    </exec>
+                    <copy todir="${primefaces.migration.output.dir}">
+                      <fileset dir="${primefaces.migration.staging.dir}"/>
+                    </copy>
+                    <available file="${primefaces.migration.output.dir}/target/prime.war"
+                               property="migration.new.war.exists"/>
+                    <fail unless="migration.new.war.exists"
+                          message="Migrated project published without target/prime.war"/>
+                    <delete dir="${primefaces.migration.staging.dir}" quiet="true"/>
                     <delete dir="${migration.work.dir}" quiet="true"/>
                   </target>
                 </configuration>
@@ -441,7 +493,7 @@
             <version>${migration.rewrite-plugin.version}</version>
             <configuration>
               <activeRecipes>
-                <recipe>pl.demo.ice.migrate.IceToPrimeFaces</recipe>
+                <recipe>${rewrite.activeRecipes}</recipe>
               </activeRecipes>
               <configLocation>${maven.multiModuleProjectDirectory}/rewrite.yml</configLocation>
               <failOnInvalidActiveRecipes>true</failOnInvalidActiveRecipes>
@@ -458,7 +510,7 @@
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-enforcer-plugin</artifactId>
-            <version>1.0.1</version>
+            <version>${migration.maven-enforcer-plugin.version}</version>
             <executions>
               <execution>
                 <id>require-modern-maven-for-migration</id>

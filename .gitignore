@@ -1,4 +1,5 @@
 target/
+primefaces-migrated/
 .idea/
 .DS_Store
 *.log
