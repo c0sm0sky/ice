@@ -60,11 +60,15 @@ Plik `WEB-INF/jboss-deployment-structure.xml` wyłącza integrację JSF WildFly 
 ## Eksperymentalna migracja ICEfaces do PrimeFaces
 Migracja jest odtwarzalna i nie zmienia źródłowego wariantu ICE. Wersje docelowe znajdują się w sekcji `<properties>` pliku `pom.xml` jako `migration.*`; recepty OpenRewrite są w `rewrite.yml`.
 
+Własne recepty są w module `rewrite-plugins/`. Moduł ponownie wykorzystuje oficjalne recepty OpenRewrite dostępne w Maven Central dla migracji Jakarta, Spring Framework i Hibernate, a uzupełnia je o brakujące transformacje, między innymi ICEfaces do PrimeFaces oraz konfigurację Spring, Web Flow i WildFly. Recepty można ponownie uruchamiać i rozwijać dla projektów ze zgodnym stosem. Część jest ogólna, a część dopasowana do struktury tej aplikacji.
+
 Profil wymaga JDK 25 i Maven 3.6.3 lub nowszego. Tworzy kompletny, samodzielny projekt PrimeFaces w `primefaces-migrated/`, usuwa z jego POM-a profil migracyjny, a następnie buduje WAR właśnie z tego projektu. Źródła ICE pozostają bez zmian:
 
 ```sh
 mvn clean install -P primefaces-migration
 ```
+
+`mvn clean -P primefaces-migration` usuwa również wygenerowany katalog `primefaces-migrated/`.
 
 Wynikowy projekt można potem budować niezależnie od ICE i profilu migracyjnego:
 

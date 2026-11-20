@@ -1,27 +1,79 @@
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: pl.demo.ice.migrate.IceToPrimeFaces
-displayName: Replace the used ICEfaces components with PrimeFaces and Jakarta Faces
-description: Replaces only the ICEfaces components and dependencies currently used by this application.
+displayName: Migrate ICEfaces XHTML components to PrimeFaces and Jakarta Faces
+description: Applies tag-library-derived mappings and explicit aliases for ICEfaces XHTML components.
 recipeList:
-  # Zamienia pakiety i API Java EE z javax na jakarta.
-  - org.openrewrite.java.migrate.jakarta.JavaxMigrationToJakarta
+  # Migruje Java EE do Jakarta, a web.xml ustawia według wersji Servletu z POM-a.
+  - pl.demo.ice.rewrite.MigrateJakartaToConfiguredServletVersion:
+      servletVersion: '${migration.jakarta-servlet.version}'
+  # Przekształca stare definicje Web Flow 1.x przed normalizacją przepływu aplikacji.
+  - pl.demo.ice.rewrite.UpgradeMainFlowWithWebFlowUpgrader
   # Zamienia używane w aplikacji znaczniki Facelets i atrybuty AJAX ICEfaces na PrimeFaces.
   - pl.demo.ice.migrate.IceComponentsToPrimeFaces
   # Aktualizuje beany DBCP, Hibernate, Spring i Web Flow w applicationContext.xml.
   - pl.demo.ice.migrate.ApplicationContextChanges
-  # Aktualizuje wywołania Hibernate w UserDao i UserDataInitializer.
-  - pl.demo.ice.migrate.UserPersistenceChanges
+  # Usuwa wycofane moduły Spring 2, zanim recepty podbiją wersje zależności.
+  - pl.demo.ice.migrate.RemoveLegacySpringModules
+  # Uruchamia oficjalny łańcuch migracji Spring Framework od 5.0 do 7.0.
+  - org.openrewrite.java.spring.framework.UpgradeSpringFramework_7_0
+  # Aktualizuje pakiet integracji Spring ORM dla Hibernate 7; upstream nie ma tej migracji XML.
+  - pl.demo.ice.rewrite.UpgradeSpring7HibernateIntegration
+  # Uruchamia oficjalną migrację i uniwersalne zmiany nazw metod Hibernate.
+  - pl.demo.ice.rewrite.MigrateHibernateWithOfficialRecipes
   # Usuwa konfigurację serwletów ICEfaces i dodaje mapowania Jakarta Faces oraz Spring.
   - pl.demo.ice.migrate.WebXmlChanges
   # Przekazuje żądania z głównego adresu do Web Flow i pozostawia generowane adresy flow w katalogu głównym.
   - pl.demo.ice.migrate.RootFlowUrlChanges
-  # Poprawia main-flow.xml po osobnym uruchomieniu WebFlowUpgrader.
+  # Dostosowuje przepływ logowania i sesyjny zakres beana do aplikacji.
   - pl.demo.ice.migrate.NormalizeMainFlowForWebFlow4
   # Usuwa stary faces-config.xml i tworzy dispatcher-servlet.xml.
   - pl.demo.ice.migrate.RemoveLegacyFacesConfiguration
-  # Usuwa wykluczenia JSF/JPA WildFlya, pozostawiając wykluczenie Hibernate.
-  - pl.demo.ice.migrate.JbossDeploymentStructureChanges
+  # Usuwa konfigurowalne, stare wykluczenia modułów JSF/JPA i podsystemu JSF WildFlya.
+  - pl.demo.ice.rewrite.MigrateWildFlyDeploymentStructure:
+      filePattern: src/main/webapp/WEB-INF/jboss-deployment-structure.xml
+      modulesToUnexclude: javax.faces.api,javax.persistence.api,org.jboss.as.jsf,com.sun.jsf-impl
+      subsystemsToUnexclude: jsf
+  # Ustawia kanoniczny URI PrimeFaces po wszystkich receptach Jakarta/JSF.
+  - pl.demo.ice.migrate.NormalizePrimeFacesNamespace
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: pl.demo.ice.migrate.NormalizePrimeFacesNamespace
+displayName: Normalize the PrimeFaces namespace URI
+description: Set the PrimeFaces tag-library URI after Jakarta and JSF migration recipes have run.
+preconditions:
+  - org.openrewrite.FindSourceFiles:
+      filePattern: src/main/webapp/**/*.xhtml
+recipeList:
+  - org.openrewrite.xml.ChangeTagAttribute:
+      elementName: "//*[local-name()='composition']"
+      attributeName: xmlns:p
+      newValue: http://primefaces.org/ui
+  - org.openrewrite.xml.ChangeTagAttribute:
+      elementName: "//*[local-name()='view']"
+      attributeName: xmlns:p
+      newValue: http://primefaces.org/ui
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: pl.demo.ice.migrate.RemoveLegacySpringModules
+displayName: Remove obsolete Spring 2 modules before upgrading Spring
+description: Remove Spring modules no longer published in modern Framework releases before the upgrade chain resolves the Maven model.
+preconditions:
+  - org.openrewrite.FindSourceFiles:
+      filePattern: '**/pom.xml'
+recipeList:
+  - org.openrewrite.maven.RemoveManagedDependency:
+      groupId: org.springframework
+      artifactId: spring-dao
+  - org.openrewrite.maven.RemoveManagedDependency:
+      groupId: org.springframework
+      artifactId: spring-hibernate3
+  - org.openrewrite.maven.RemoveDependency:
+      groupId: org.springframework
+      artifactId: spring-dao
+  - org.openrewrite.maven.RemoveDependency:
+      groupId: org.springframework
+      artifactId: spring-hibernate3
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: pl.demo.ice.migrate.PrimeFacesPomChanges
@@ -54,30 +106,12 @@ recipeList:
       groupId: org.primefaces
       artifactId: primefaces
       version: '${migration.primefaces.version}'
-  - org.openrewrite.maven.RemoveManagedDependency:
-      groupId: org.springframework
-      artifactId: spring-dao
-  - org.openrewrite.maven.RemoveManagedDependency:
-      groupId: org.springframework
-      artifactId: spring-hibernate3
-  - org.openrewrite.maven.RemoveDependency:
-      groupId: org.springframework
-      artifactId: spring-dao
-  - org.openrewrite.maven.RemoveDependency:
-      groupId: org.springframework
-      artifactId: spring-hibernate3
   - org.openrewrite.maven.ChangeDependencyGroupIdAndArtifactId:
       oldGroupId: org.springframework
       oldArtifactId: spring-webflow
       newGroupId: org.springframework.webflow
       newArtifactId: spring-webflow
       newVersion: '${migration.spring-webflow.version}'
-  - org.openrewrite.maven.ChangeDependencyGroupIdAndArtifactId:
-      oldGroupId: org.hibernate
-      oldArtifactId: hibernate-core
-      newGroupId: org.hibernate.orm
-      newArtifactId: hibernate-core
-      newVersion: '${migration.hibernate.version}'
   - org.openrewrite.maven.ChangeDependencyGroupIdAndArtifactId:
       oldGroupId: commons-dbcp
       oldArtifactId: commons-dbcp
@@ -123,10 +157,6 @@ recipeList:
       groupId: jakarta.servlet
       artifactId: jakarta.servlet-api
       newScope: provided
-  - org.openrewrite.maven.UpgradeDependencyVersion:
-      groupId: jakarta.servlet
-      artifactId: jakarta.servlet-api
-      newVersion: '${migration.jakarta-servlet.version}'
   - org.openrewrite.maven.AddDependency:
       groupId: jakarta.faces
       artifactId: jakarta.faces-api
@@ -174,6 +204,10 @@ recipeList:
       oldValue: ice
       newValue: prime
   - org.openrewrite.maven.ExtractVersionsAsProperties
+  # Ekstrakcja potrafi odtworzyć wersję 5.0.0 z recepty Jakarta; przywracamy wersję z profilu.
+  - org.openrewrite.maven.ChangePropertyValue:
+      key: jakarta.servlet.version
+      newValue: '${migration.jakarta-servlet.version}'
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: pl.demo.ice.migrate.NormalizeMainFlowForWebFlow4
@@ -241,90 +275,14 @@ recipeList:
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: pl.demo.ice.migrate.IceComponentsToPrimeFaces
-displayName: Replace used ICEfaces XHTML components
-description: Convert the ICEfaces namespaces, tags, and AJAX attributes used by the Facelets pages.
+displayName: Migrate ICEfaces XHTML components to PrimeFaces
+description: Convert known ICEfaces tags across Facelets pages and stop with a component-specific hint when a used tag needs structural or Java-model changes.
 preconditions:
   - org.openrewrite.FindSourceFiles:
       filePattern: src/main/webapp/**/*.xhtml
 recipeList:
-  # Wspólne przestrzenie nazw Facelets i zamiana komponentów ICEfaces we wszystkich plikach XHTML.
-  - org.openrewrite.xml.AddTagAttribute:
-      elementName: //f:view
-      attributeName: xmlns:h
-      newValue: jakarta.faces.html
-  - org.openrewrite.xml.AddTagAttribute:
-      elementName: //ui:composition
-      attributeName: xmlns:h
-      newValue: jakarta.faces.html
-  - org.openrewrite.xml.ChangeTagAttribute:
-      elementName: //f:view
-      attributeName: xmlns:ui
-      oldValue: http://java.sun.com/jsf/facelets
-      newValue: jakarta.faces.facelets
-  - org.openrewrite.xml.ChangeTagAttribute:
-      elementName: //ui:composition
-      attributeName: xmlns:ui
-      oldValue: http://java.sun.com/jsf/facelets
-      newValue: jakarta.faces.facelets
-  - org.openrewrite.xml.ChangeTagAttribute:
-      elementName: //f:view
-      attributeName: xmlns:f
-      oldValue: http://java.sun.com/jsf/core
-      newValue: jakarta.faces.core
-  - org.openrewrite.xml.ChangeTagAttribute:
-      elementName: //ui:composition
-      attributeName: xmlns:f
-      oldValue: http://java.sun.com/jsf/core
-      newValue: jakarta.faces.core
-  - org.openrewrite.xml.ChangeTagAttributeKey:
-      xPath: //@xmlns:ice
-      newAttributeName: xmlns:p
-  - org.openrewrite.xml.ChangeTagAttribute:
-      elementName: //f:view
-      attributeName: xmlns:p
-      oldValue: http://www.icesoft.com/icefaces/component
-      newValue: http://primefaces.org/ui
-  - org.openrewrite.xml.ChangeTagAttribute:
-      elementName: //ui:composition
-      attributeName: xmlns:p
-      oldValue: http://www.icesoft.com/icefaces/component
-      newValue: http://primefaces.org/ui
-
-  # Globalna zamiana nazw znaczników.
-  - org.openrewrite.xml.ChangeTagName:
-      elementName: //head
-      newName: h:head
-  - org.openrewrite.xml.ChangeTagName:
-      elementName: //body
-      newName: h:body
-  - org.openrewrite.xml.ChangeTagName:
-      elementName: //ice:form
-      newName: h:form
-  - org.openrewrite.xml.ChangeTagName:
-      elementName: //ice:inputText
-      newName: p:inputText
-  - org.openrewrite.xml.ChangeTagName:
-      elementName: //ice:inputSecret
-      newName: p:password
-  - org.openrewrite.xml.ChangeTagName:
-      elementName: //ice:commandLink
-      newName: p:commandLink
-  - org.openrewrite.xml.ChangeTagName:
-      elementName: //ice:commandButton
-      newName: p:commandButton
-  - org.openrewrite.xml.ChangeTagName:
-      elementName: //ice:messages
-      newName: p:messages
-  - org.openrewrite.xml.ChangeTagName:
-      elementName: //ice:outputLabel
-      newName: p:outputLabel
-  - org.openrewrite.xml.ChangeTagName:
-      elementName: //ice:outputText
-      newName: h:outputText
-  - org.openrewrite.xml.ChangeTagName:
-      elementName: //ice:outputStyle
-      newName: h:outputStylesheet
-
+  # Odczytuje deskryptory bibliotek, mapuje tagi i przełącza namespace ICEfaces na PrimeFaces.
+  - pl.demo.ice.rewrite.IcefacesTagsToPrimeFaces
   # Zachowuje obsługę AJAX i renderowanie dla każdego migrowanego komponentu akcji.
   - org.openrewrite.xml.AddTagAttribute:
       elementName: //p:commandLink
@@ -427,30 +385,85 @@ recipeList:
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: pl.demo.ice.migrate.WebXmlChanges
-displayName: Apply grouped changes to src/main/webapp/WEB-INF/web.xml
-description: Remove ICEfaces servlet infrastructure and register the Faces and Spring Web Flow endpoints.
+displayName: Apply project-specific changes to src/main/webapp/WEB-INF/web.xml
+description: Remove ICEfaces servlet infrastructure and register this application's Faces and Spring endpoints.
 preconditions:
   - org.openrewrite.FindSourceFiles:
       filePattern: src/main/webapp/WEB-INF/web.xml
 recipeList:
-  - org.openrewrite.xml.RemoveXmlTag:
-      xPath: "/web-app/context-param[param-name='com.icesoft.faces.actionURLSuffix' or param-name='com.icesoft.faces.synchronousUpdate']"
-  - org.openrewrite.xml.RemoveXmlTag:
-      xPath: "/web-app/listener[listener-class='com.icesoft.faces.util.event.servlet.ContextEventRepeater']"
-  - org.openrewrite.xml.RemoveXmlTag:
-      xPath: "/web-app/filter[filter-name='Spring Web Flow Cleanup']"
-  - org.openrewrite.xml.RemoveXmlTag:
-      xPath: "/web-app/filter-mapping[filter-name='Spring Web Flow Cleanup']"
-  - org.openrewrite.xml.RemoveXmlTag:
-      xPath: "/web-app/servlet[servlet-name='Persistent Faces Servlet' or servlet-name='Blocking Servlet']"
-  - org.openrewrite.xml.RemoveXmlTag:
-      xPath: "/web-app/servlet-mapping[servlet-name='Persistent Faces Servlet' or servlet-name='Blocking Servlet']"
+  # Rewrite XML nie dopasowuje tu niezawodnie XPath do deskryptora z domyślną przestrzenią nazw.
+  # Usuwamy dokładne bloki ICEfaces i starego filtra, zachowując pozostałą konfigurację.
   - org.openrewrite.text.FindAndReplace:
-      find: 'https://jakarta.ee/xml/ns/jakartaee/web-app_5_0.xsd'
-      replace: 'https://jakarta.ee/xml/ns/jakartaee/web-app_6_1.xsd'
+      find: |-
+        <context-param>
+            <param-name>com.icesoft.faces.actionURLSuffix</param-name>
+            <param-value>.iface</param-value>
+          </context-param>
+      replace: ''
   - org.openrewrite.text.FindAndReplace:
-      find: 'version="5.0"'
-      replace: 'version="6.1"'
+      find: |-
+        <context-param>
+            <param-name>com.icesoft.faces.synchronousUpdate</param-name>
+            <param-value>true</param-value>
+          </context-param>
+      replace: ''
+  - org.openrewrite.text.FindAndReplace:
+      find: |-
+        <listener>
+            <listener-class>com.icesoft.faces.util.event.servlet.ContextEventRepeater</listener-class>
+          </listener>
+      replace: ''
+  - org.openrewrite.text.FindAndReplace:
+      find: |-
+        <filter>
+            <filter-name>Spring Web Flow Cleanup</filter-name>
+            <filter-class>org.springframework.webflow.executor.jsf.FlowSystemCleanupFilter</filter-class>
+          </filter>
+      replace: ''
+  - org.openrewrite.text.FindAndReplace:
+      find: |-
+        <filter-mapping>
+            <filter-name>Spring Web Flow Cleanup</filter-name>
+            <url-pattern>/*</url-pattern>
+          </filter-mapping>
+      replace: ''
+  - org.openrewrite.text.FindAndReplace:
+      find: |-
+        <servlet>
+            <servlet-name>Persistent Faces Servlet</servlet-name>
+            <servlet-class>com.icesoft.faces.webapp.xmlhttp.PersistentFacesServlet</servlet-class>
+            <load-on-startup>1</load-on-startup>
+          </servlet>
+      replace: ''
+  - org.openrewrite.text.FindAndReplace:
+      find: |-
+        <servlet-mapping>
+            <servlet-name>Persistent Faces Servlet</servlet-name>
+            <url-pattern>*.iface</url-pattern>
+          </servlet-mapping>
+      replace: ''
+  - org.openrewrite.text.FindAndReplace:
+      find: |-
+        <servlet-mapping>
+            <servlet-name>Persistent Faces Servlet</servlet-name>
+            <url-pattern>/xmlhttp/*</url-pattern>
+          </servlet-mapping>
+      replace: ''
+  - org.openrewrite.text.FindAndReplace:
+      find: |-
+        <servlet>
+            <servlet-name>Blocking Servlet</servlet-name>
+            <servlet-class>com.icesoft.faces.webapp.xmlhttp.BlockingServlet</servlet-class>
+            <load-on-startup>1</load-on-startup>
+          </servlet>
+      replace: ''
+  - org.openrewrite.text.FindAndReplace:
+      find: |-
+        <servlet-mapping>
+            <servlet-name>Blocking Servlet</servlet-name>
+            <url-pattern>/block/*</url-pattern>
+          </servlet-mapping>
+      replace: ''
   - org.openrewrite.text.FindAndReplace:
       find: '<display-name>Ice</display-name>'
       replace: '<display-name>Ice PrimeFaces</display-name>'
@@ -488,31 +501,6 @@ recipeList:
         <session-config><session-timeout>30</session-timeout><tracking-mode>COOKIE</tracking-mode></session-config>
 ---
 type: specs.openrewrite.org/v1beta/recipe
-name: pl.demo.ice.migrate.UserPersistenceChanges
-displayName: Apply Hibernate API changes to user persistence classes
-description: Update Hibernate query and persistence calls in the DAO and startup data initializer.
-preconditions:
-  - org.openrewrite.FindSourceFiles:
-      filePattern: 'src/main/java/pl/demo/ice/db/User{Dao,DataInitializer}.java'
-recipeList:
-  # Najpierw zmienia metody na podstawie typów; podmiany tekstu później przekształcają źródło Java w zwykły tekst.
-  - org.openrewrite.java.ChangeMethodName:
-      methodPattern: 'org.hibernate.Query#setString(..)'
-      newMethodName: setParameter
-  - org.openrewrite.java.ChangeMethodName:
-      methodPattern: 'org.hibernate.Session#save(..)'
-      newMethodName: persist
-  - org.openrewrite.java.ChangeMethodName:
-      methodPattern: 'org.hibernate.Query#list()'
-      newMethodName: getResultList
-  - org.openrewrite.text.FindAndReplace:
-      find: 'createQuery("from User u where u.login = :login")'
-      replace: 'createSelectionQuery("from User u where u.login = :login", User.class)'
-  - org.openrewrite.text.FindAndReplace:
-      find: 'createQuery("from User u order by u.login")'
-      replace: 'createSelectionQuery("from User u order by u.login", User.class)'
----
-type: specs.openrewrite.org/v1beta/recipe
 name: pl.demo.ice.migrate.ApplicationContextChanges
 displayName: Apply grouped changes to src/main/webapp/WEB-INF/applicationContext.xml
 description: Update database, Hibernate, and Spring Web Flow wiring for the migrated application.
@@ -520,104 +508,9 @@ preconditions:
   - org.openrewrite.FindSourceFiles:
       filePattern: src/main/webapp/WEB-INF/applicationContext.xml
 recipeList:
-  # Najpierw wykonuje zmiany strukturalne XML; późniejsze recepty tekstowe aktualizują adresy schematów i bloki Web Flow.
-  - org.openrewrite.xml.ChangeTagAttribute:
-      elementName: "//*[local-name()='bean'][@id='dataSource']"
-      attributeName: class
-      oldValue: org.apache.commons.dbcp.BasicDataSource
-      newValue: org.apache.commons.dbcp2.BasicDataSource
-  - org.openrewrite.xml.ChangeTagAttribute:
-      elementName: "//*[local-name()='bean'][@id='sessionFactory']"
-      attributeName: class
-      oldValue: org.springframework.orm.hibernate3.LocalSessionFactoryBean
-      newValue: org.springframework.orm.jpa.hibernate.LocalSessionFactoryBean
-  - org.openrewrite.xml.ChangeTagAttribute:
-      elementName: "//*[local-name()='bean'][@id='transactionManager']"
-      attributeName: class
-      oldValue: org.springframework.orm.hibernate3.HibernateTransactionManager
-      newValue: org.springframework.orm.jpa.hibernate.HibernateTransactionManager
-  - org.openrewrite.xml.ChangeTagAttribute:
-      elementName: "//*[local-name()='property'][@name='maxActive']"
-      attributeName: name
-      oldValue: maxActive
-      newValue: maxTotal
-  - org.openrewrite.xml.ChangeTagValue:
-      elementName: "//*[local-name()='prop'][@key='hibernate.current_session_context_class']"
-      oldValue: org.springframework.orm.hibernate3.SpringSessionContext
-      newValue: org.springframework.orm.jpa.hibernate.SpringSessionContext
-  - org.openrewrite.xml.ChangeTagAttribute:
-      elementName: "//*[local-name()='bean'][@id='propertyConfigurer']"
-      attributeName: class
-      oldValue: org.springframework.beans.factory.config.PropertyPlaceholderConfigurer
-      newValue: org.springframework.context.support.PropertySourcesPlaceholderConfigurer
-  - org.openrewrite.xml.RemoveXmlTag:
-      xPath: "//*[local-name()='bean'][@id='propertyConfigurer']/*[local-name()='property'][@name='systemPropertiesModeName']"
-  - org.openrewrite.text.FindAndReplace:
-      find: 'xmlns:flow="http://www.springframework.org/schema/webflow-config"'
-      replace: 'xmlns:webflow="http://www.springframework.org/schema/webflow-config"'
-  - org.openrewrite.text.FindAndReplace:
-      find: 'xmlns:webflow="http://www.springframework.org/schema/webflow-config"(?![\s\S]*xmlns:faces=)'
-      replace: |-
-        xmlns:webflow="http://www.springframework.org/schema/webflow-config"
-               xmlns:faces="http://www.springframework.org/schema/faces"
-      regex: true
-      dotAll: true
-  - org.openrewrite.text.FindAndReplace:
-      find: 'http://www.springframework.org/schema/beans/spring-beans-2.0.xsd'
-      replace: 'https://www.springframework.org/schema/beans/spring-beans.xsd'
-  - org.openrewrite.text.FindAndReplace:
-      find: 'http://www.springframework.org/schema/tx/spring-tx-2.0.xsd'
-      replace: 'https://www.springframework.org/schema/tx/spring-tx.xsd'
-  - org.openrewrite.text.FindAndReplace:
-      find: 'http://www.springframework.org/schema/webflow-config/spring-webflow-config-1.0.xsd'
-      replace: 'https://www.springframework.org/schema/webflow-config/spring-webflow-config.xsd'
-  - org.openrewrite.text.FindAndReplace:
-      find: 'https://www.springframework.org/schema/webflow-config/spring-webflow-config.xsd(?![\s\S]*spring-faces.xsd)'
-      replace: |-
-        https://www.springframework.org/schema/webflow-config/spring-webflow-config.xsd
-                 http://www.springframework.org/schema/faces https://www.springframework.org/schema/faces/spring-faces.xsd
-      regex: true
-      dotAll: true
-  # Dopasowuje elementy Web Flow niezależnie od wcięć i kolejności atrybutów.
-  - org.openrewrite.text.FindAndReplace:
-      find: '<flow:executor\b[^>]*>[\s\S]*?</flow:executor>'
-      replace: |-
-        <webflow:flow-executor id="flowExecutor">
-          <webflow:flow-execution-listeners><webflow:listener ref="facesContextListener"/></webflow:flow-execution-listeners>
-          <webflow:flow-execution-repository max-execution-snapshots="30"/>
-          <webflow:flow-execution-attributes>
-            <webflow:always-redirect-on-pause value="false"/>
-          </webflow:flow-execution-attributes>
-        </webflow:flow-executor>
-      regex: true
-      dotAll: true
-  - org.openrewrite.text.FindAndReplace:
-      find: '<flow:registry\b[^>]*>[\s\S]*?</flow:registry>'
-      replace: |-
-        <webflow:flow-registry id="flowRegistry" flow-builder-services="flowBuilderServices" base-path="/WEB-INF">
-          <webflow:flow-location path="/flows/main-flow.xml" id="main-flow"/>
-        </webflow:flow-registry>
-        <faces:flow-builder-services id="flowBuilderServices"/>
-        <bean id="facesContextListener" class="org.springframework.faces.webflow.FlowFacesContextLifecycleListener"/>
-      regex: true
-      dotAll: true
----
-type: specs.openrewrite.org/v1beta/recipe
-name: pl.demo.ice.migrate.JbossDeploymentStructureChanges
-displayName: Apply grouped changes to src/main/webapp/WEB-INF/jboss-deployment-structure.xml
-description: Remove server JSF module exclusions while retaining the Hibernate module exclusion.
-preconditions:
-  - org.openrewrite.FindSourceFiles:
-      filePattern: src/main/webapp/WEB-INF/jboss-deployment-structure.xml
-recipeList:
-  # Zachowuje izolację modułu Hibernate; usuwa tylko wykluczenia serwerowych modułów JSF/JPA.
-  - org.openrewrite.xml.RemoveXmlTag:
-      xPath: "//*[local-name()='exclude-subsystems'][*[local-name()='subsystem'][@name='jsf']]"
-  - org.openrewrite.xml.RemoveXmlTag:
-      xPath: "//*[local-name()='module'][@name='javax.faces.api']"
-  - org.openrewrite.xml.RemoveXmlTag:
-      xPath: "//*[local-name()='module'][@name='javax.persistence.api']"
-  - org.openrewrite.xml.RemoveXmlTag:
-      xPath: "//*[local-name()='module'][@name='org.jboss.as.jsf']"
-  - org.openrewrite.xml.RemoveXmlTag:
-      xPath: "//*[local-name()='module'][@name='com.sun.jsf-impl']"
+  # Migruje elementy i atrybuty konfiguracji Web Flow 1.x do Web Flow 4.x.
+  - pl.demo.ice.rewrite.UpgradeWebFlowConfiguration
+  # Migruje deklaracje DBCP, Hibernate i konfiguratora placeholderów przez reguły pluginu.
+  - pl.demo.ice.rewrite.UpgradeLegacySpringInfrastructure
+  # Uzupełnia integrację Spring Faces i adresy schematów już w receptach Rewrite.
+  - pl.demo.ice.rewrite.UpgradeSpringFacesIntegration
