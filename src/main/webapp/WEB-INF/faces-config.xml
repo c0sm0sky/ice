@@ -12,6 +12,6 @@
     <variable-resolver>org.springframework.web.jsf.WebApplicationContextVariableResolver</variable-resolver>
   </application>
   <lifecycle>
-    <phase-listener>org.springframework.webflow.executor.jsf.FlowPhaseListener</phase-listener>
+    <phase-listener>pl.demo.ice.web.SessionFlowPhaseListener</phase-listener>
   </lifecycle>
 </faces-config>

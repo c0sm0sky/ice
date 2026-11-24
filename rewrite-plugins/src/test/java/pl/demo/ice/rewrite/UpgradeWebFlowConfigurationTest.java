@@ -28,7 +28,7 @@ class UpgradeWebFlowConfigurationTest implements RewriteTest {
           """, """
           <beans xmlns:flow="http://www.springframework.org/schema/webflow-config">
             <flow:flow-executor id="flowExecutor" flow-registry="flowRegistry">
-              <flow:flow-execution-repository max-execution-snapshots="30"/>
+              <flow:flow-execution-repository max-execution-snapshots="0"/>
               <flow:flow-execution-attributes>
                 <flow:always-redirect-on-pause value="false"/>
               </flow:flow-execution-attributes>
@@ -37,6 +37,21 @@ class UpgradeWebFlowConfigurationTest implements RewriteTest {
               <flow:flow-location path="/WEB-INF/flows/main-flow.xml"/>
               <flow:flow-location-pattern value="/WEB-INF/flows/*.xml"/>
             </flow:flow-registry>
+          </beans>
+          """));
+    }
+
+    @Test
+    void continuationRepositoryKeepsSerializedSnapshots() {
+        rewriteRun(xml("""
+          <beans xmlns:flow="http://www.springframework.org/schema/webflow-config">
+            <flow:executor id="flowExecutor" registry-ref="flowRegistry" repository-type="continuation"/>
+          </beans>
+          """, """
+          <beans xmlns:flow="http://www.springframework.org/schema/webflow-config">
+            <flow:flow-executor id="flowExecutor" flow-registry="flowRegistry">
+              <flow:flow-execution-repository max-execution-snapshots="30"/>
+            </flow:flow-executor>
           </beans>
           """));
     }
@@ -53,6 +68,76 @@ class UpgradeWebFlowConfigurationTest implements RewriteTest {
           <beans xmlns:flow="http://www.springframework.org/schema/webflow-config">
             <flow:flow-executor id="flowExecutor" flow-registry="flowRegistry">
               <flow:flow-execution-repository max-execution-snapshots="12" max-executions="5"/>
+            </flow:flow-executor>
+          </beans>
+          """));
+    }
+
+    @Test
+    void preservesExecutionAttributesAndListenerConfiguration() {
+        rewriteRun(xml("""
+          <beans xmlns:flow="http://www.springframework.org/schema/webflow-config">
+            <flow:executor id="flowExecutor" registry-ref="flowRegistry" repository-type="continuation">
+              <flow:execution-attributes>
+                <flow:alwaysRedirectOnPause value="false"/>
+                <flow:attribute name="auditMode" type="java.lang.String" value="strict"/>
+              </flow:execution-attributes>
+              <flow:execution-listeners>
+                <flow:listener ref="auditListener" criteria="orders,customers"/>
+              </flow:execution-listeners>
+            </flow:executor>
+          </beans>
+          """, """
+          <beans xmlns:flow="http://www.springframework.org/schema/webflow-config">
+            <flow:flow-executor id="flowExecutor" flow-registry="flowRegistry">
+              <flow:flow-execution-repository max-execution-snapshots="30"/>
+              <flow:flow-execution-attributes>
+                <flow:always-redirect-on-pause value="false"/>
+                <flow:attribute name="auditMode" type="java.lang.String" value="strict"/>
+              </flow:flow-execution-attributes>
+              <flow:flow-execution-listeners>
+                <flow:listener ref="auditListener" criteria="orders,customers"/>
+              </flow:flow-execution-listeners>
+            </flow:flow-executor>
+          </beans>
+          """));
+    }
+
+    @Test
+    void mapsConversationLimitAndConversationManagerReference() {
+        rewriteRun(xml("""
+          <beans xmlns:flow="http://www.springframework.org/schema/webflow-config">
+            <flow:executor id="limitedExecutor" registry-ref="flowRegistry">
+              <flow:repository type="simple" max-conversations="4"/>
+            </flow:executor>
+            <flow:executor id="managedExecutor" registry-ref="flowRegistry">
+              <flow:repository type="continuation" conversation-manager-ref="conversationManager"/>
+            </flow:executor>
+          </beans>
+          """, """
+          <beans xmlns:flow="http://www.springframework.org/schema/webflow-config">
+            <flow:flow-executor id="limitedExecutor" flow-registry="flowRegistry">
+              <flow:flow-execution-repository max-execution-snapshots="0" max-executions="4"/>
+            </flow:flow-executor>
+            <flow:flow-executor id="managedExecutor" flow-registry="flowRegistry">
+              <flow:flow-execution-repository max-execution-snapshots="30" conversation-manager="conversationManager"/>
+            </flow:flow-executor>
+          </beans>
+          """));
+    }
+
+    @Test
+    void simpleNestedRepositoryDisablesSerializedSnapshots() {
+        rewriteRun(xml("""
+          <beans xmlns:flow="http://www.springframework.org/schema/webflow-config">
+            <flow:executor id="flowExecutor" registry-ref="flowRegistry">
+              <flow:repository type="simple"/>
+            </flow:executor>
+          </beans>
+          """, """
+          <beans xmlns:flow="http://www.springframework.org/schema/webflow-config">
+            <flow:flow-executor id="flowExecutor" flow-registry="flowRegistry">
+              <flow:flow-execution-repository max-execution-snapshots="0"/>
             </flow:flow-executor>
           </beans>
           """));

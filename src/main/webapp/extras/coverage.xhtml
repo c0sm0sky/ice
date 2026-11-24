@@ -1,0 +1,178 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:ui="http://java.sun.com/jsf/facelets"
+                xmlns:h="http://java.sun.com/jsf/html"
+                xmlns:f="http://java.sun.com/jsf/core"
+                xmlns:ice="http://www.icesoft.com/icefaces/component"
+                template="/WEB-INF/layouts/mainTemplate.xhtml">
+  <!--@elvariable id="userBean" type="pl.demo.ice.UserBean"-->
+  <ui:define name="title">Komponenty ICEfaces</ui:define>
+  <ui:define name="mainPanel">
+      <main class="compatibility-page">
+        <header class="compatibility-header">
+          <div>
+            <p>Przykłady komponentów.</p>
+          </div>
+          <ice:commandLink id="coverageBack" value="Powrót do użytkowników" action="#{userBean.returnUsers}"
+                           styleClass="compatibility-back"/>
+        </header>
+
+          <ice:messages styleClass="compatibility-messages"/>
+          <div class="compatibility-grid">
+            <section class="compatibility-card">
+              <h2>Pola formularza</h2>
+              <div class="compatibility-fields">
+                <div class="compatibility-field">
+                  <ice:outputLabel for="loginField" value="Login"/>
+                  <ice:inputText id="loginField" value="#{componentsBean.coverageLogin}" styleClass="compatibility-control"/>
+                </div>
+                <div class="compatibility-field">
+                  <ice:outputLabel for="passwordField" value="Hasło"/>
+                  <ice:inputSecret id="passwordField" value="#{componentsBean.coveragePassword}" styleClass="compatibility-control"/>
+                </div>
+                <div class="compatibility-field">
+                  <ice:outputLabel for="roleField" value="Rola"/>
+                  <ice:selectOneMenu id="roleField" value="#{componentsBean.coverageRole}">
+                    <f:selectItem itemLabel="Administrator" itemValue="admin"/>
+                    <f:selectItem itemLabel="Użytkownik" itemValue="user"/>
+                  </ice:selectOneMenu>
+                </div>
+                <div class="compatibility-field compatibility-field-wide">
+                  <ice:outputLabel for="fileField" value="Plik"/>
+                  <ice:inputFile id="fileField"/>
+                </div>
+                <div class="compatibility-field compatibility-field-wide">
+                  <ice:outputLabel for="richTextField" value="Tekst sformatowany"/>
+                  <ice:inputRichText id="richTextField" value="#{componentsBean.coverageLogin}"/>
+                </div>
+                <div class="compatibility-field">
+                  <ice:outputLabel for="dateField" value="Data"/>
+                  <ice:selectInputDate id="dateField"/>
+                </div>
+                <div class="compatibility-field">
+                  <ice:outputLabel for="suggestionField" value="Podpowiedź"/>
+                  <ice:selectInputText id="suggestionField" value="#{componentsBean.coverageSuggestion}"
+                                       valueChangeListener="#{componentsBean.updateCoverageSuggestions}"
+                                       rows="5" width="240">
+                    <f:selectItems value="#{componentsBean.coverageSuggestions}"/>
+                  </ice:selectInputText>
+                </div>
+              </div>
+            </section>
+
+            <section class="compatibility-card">
+              <h2>Wybór i nawigacja</h2>
+              <div class="compatibility-choice">
+                <ice:selectManyListbox value="#{componentsBean.coverageRoles}">
+                  <f:selectItem itemLabel="Administrator" itemValue="admin"/>
+                  <f:selectItem itemLabel="Użytkownik" itemValue="user"/>
+                </ice:selectManyListbox>
+                <ice:selectOneRadio value="#{componentsBean.coverageRole}">
+                  <f:selectItem itemLabel="Administrator" itemValue="admin"/>
+                  <f:selectItem itemLabel="Użytkownik" itemValue="user"/>
+                </ice:selectOneRadio>
+              </div>
+              <ice:menuBar id="coverageMenuBar" styleClass="compatibility-menu">
+                <ice:menuItem id="coverageMenuReturn" value="Użytkownicy" action="#{userBean.returnUsers}"/>
+                <ice:menuItemSeparator/>
+              </ice:menuBar>
+              <ice:panelGroup styleClass="compatibility-context-target" menuPopup="coverageContextMenu">
+                <ice:outputText value="Kliknij prawym przyciskiem, aby otworzyć menu ICEfaces"/>
+              </ice:panelGroup>
+              <ice:menuPopup id="coverageContextMenu">
+                <ice:menuItem id="coverageContextReturn" value="Powrót do użytkowników" action="#{userBean.returnUsers}"/>
+                <ice:menuItem id="coverageContextClose" value="Zamknij menu"/>
+              </ice:menuPopup>
+              <div class="compatibility-panels">
+                <ice:panelTabSet>
+                  <ice:panelTab label="Użytkownicy">
+                    <ice:outputText value="Zakładka ICEfaces"/>
+                  </ice:panelTab>
+                  <ice:panelTab label="Profil">
+                    <ice:outputText value="Druga zakładka ICEfaces"/>
+                  </ice:panelTab>
+                </ice:panelTabSet>
+                <ice:panelGroup styleClass="compatibility-panel">
+                  <ice:outputText value="#{userBean.loggedInName}"/>
+                  <ice:outputFormat value="Zalogowano jako: {0}">
+                    <f:param value="#{userBean.loggedInName}"/>
+                  </ice:outputFormat>
+                  <ice:outputProgress value="50"/>
+                </ice:panelGroup>
+              </div>
+            </section>
+
+            <section class="compatibility-card compatibility-card-wide">
+              <h2>Tabela i panele</h2>
+              <ice:panelGroup styleClass="compatibility-table-wrap">
+                <div class="compatibility-filter">
+                  <ice:outputLabel for="userFilter" value="Filtruj użytkowników"/>
+                  <ice:inputText id="userFilter" value="#{componentsBean.coverageUserFilter}" styleClass="compatibility-control"/>
+                  <ice:commandButton id="coverageFilter" value="Filtruj" action="#{componentsBean.applyCoverageUserFilter}" partialSubmit="true"/>
+                  <ice:commandButton id="coverageClearFilter" value="Wyczyść" action="#{componentsBean.clearCoverageUserFilter}" partialSubmit="true"/>
+                </div>
+                <ice:dataTable value="#{componentsBean.coverageUsers}" var="row" sortColumn="#{componentsBean.coverageSortColumn}"
+                               sortAscending="#{componentsBean.coverageSortAscending}" styleClass="compatibility-table">
+                  <ice:column>
+                    <f:facet name="header">
+                      <ice:commandSortHeader columnName="login" arrow="true" partialSubmit="true">
+                        <ice:outputText value="Login"/>
+                      </ice:commandSortHeader>
+                    </f:facet>
+                    <ice:outputText value="#{row.login}"/>
+                  </ice:column>
+                  <ice:column>
+                    <f:facet name="header">
+                      <ice:commandSortHeader columnName="imie" arrow="true" partialSubmit="true">
+                        <ice:outputText value="Imię"/>
+                      </ice:commandSortHeader>
+                    </f:facet>
+                    <ice:outputText value="#{row.imie}"/>
+                  </ice:column>
+                </ice:dataTable>
+              </ice:panelGroup>
+              <div class="compatibility-examples">
+                <ice:commandLink id="coverageConfirmLink" value="Pokaż potwierdzenie" panelConfirmation="coverageConfirmation"
+                                 partialSubmit="true"/>
+                <ice:panelConfirmation id="coverageConfirmation" title="Potwierdzenie"
+                                       message="Potwierdź operację" acceptLabel="Tak" cancelLabel="Nie"/>
+                <ice:commandLink id="coveragePopupOpen" value="Otwórz okno" actionListener="#{componentsBean.showCoveragePopup}"
+                                 partialSubmit="true"/>
+                <ice:panelPopup id="coveragePopup" visible="#{componentsBean.coveragePopupVisible}"
+                                draggable="true" autoCentre="true" styleClass="compatibility-popup">
+                  <f:facet name="header">
+                    <ice:outputText value="Okno ICEfaces"/>
+                  </f:facet>
+                  <f:facet name="body">
+                    <ice:panelGroup>
+                      <ice:outputText value="Przykładowe okno ICEfaces"/>
+                      <ice:commandLink id="coveragePopupClose" value="Zamknij" actionListener="#{componentsBean.hideCoveragePopup}"
+                                       partialSubmit="true"/>
+                    </ice:panelGroup>
+                  </f:facet>
+                </ice:panelPopup>
+                <ice:panelGroup styleClass="compatibility-tooltip-target" panelTooltip="coverageTooltip">
+                  <ice:outputText value="Najedź, aby zobaczyć podpowiedź"/>
+                </ice:panelGroup>
+                <ice:panelTooltip id="coverageTooltip" styleClass="compatibility-tooltip">
+                  <f:facet name="header"><ice:outputText value="Podpowiedź"/></f:facet>
+                  <f:facet name="body"><ice:outputText value="Informacje o użytkowniku"/></f:facet>
+                </ice:panelTooltip>
+              </div>
+              <ice:panelDivider dividerPosition="50" orientation="vertical" styleClass="compatibility-divider">
+                <f:facet name="first">
+                  <ice:panelGroup styleClass="compatibility-divider-pane">
+                    <ice:outputText value="Pierwszy panel"/>
+                  </ice:panelGroup>
+                </f:facet>
+                <f:facet name="second">
+                  <ice:panelGroup styleClass="compatibility-divider-pane">
+                    <ice:outputText value="Drugi panel"/>
+                  </ice:panelGroup>
+                </f:facet>
+              </ice:panelDivider>
+            </section>
+
+          </div>
+      </main>
+  </ui:define>
+</ui:composition>

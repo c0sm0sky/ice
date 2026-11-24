@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<ui:composition xmlns:ice="http://www.icesoft.com/icefaces/component"
+<ui:composition xmlns:f="http://java.sun.com/jsf/core"
+                xmlns:ice="http://www.icesoft.com/icefaces/component"
                 xmlns:ui="http://java.sun.com/jsf/facelets"
                 template="/WEB-INF/layouts/mainTemplate.xhtml">
-  <ui:define name="title">Ice | Logowanie</ui:define>
+  <!--@elvariable id="userBean" type="pl.demo.ice.UserBean"-->
+  <ui:define name="title">Logowanie</ui:define>
   <ui:define name="mainPanel">
     <div class="login-page">
         <main class="login-card">
@@ -20,15 +22,6 @@
                                onkeypress="return submitLoginOnEnter(event);"/>
             </div>
             <ice:commandLink id="loginAction" value="Zaloguj się" action="#{userBean.login}" styleClass="primary full"/>
-            <script type="text/javascript">
-              function submitLoginOnEnter(event) {
-                var keyCode = event ? event.keyCode : window.event.keyCode;
-                if (keyCode !== 13) return true;
-                var loginAction = document.getElementById('mainForm:loginAction');
-                if (loginAction) loginAction.click();
-                return false;
-              }
-            </script>
         </main>
     </div>
   </ui:define>

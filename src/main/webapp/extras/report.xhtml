@@ -1,0 +1,35 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:ui="http://java.sun.com/jsf/facelets"
+                xmlns:ice="http://www.icesoft.com/icefaces/component"
+                template="/WEB-INF/layouts/mainTemplate.xhtml">
+  <ui:define name="title">Przepływ raportu</ui:define>
+  <ui:define name="mainPanel">
+    <main class="compatibility-page flow-page">
+      <header class="compatibility-header">
+        <div>
+          <p class="compatibility-eyebrow">Spring Web Flow</p>
+          <h1>Raport</h1>
+          <p>Notatka zostaje zapisana w sesji, a zapis przechodzi przez akcję flow.</p>
+        </div>
+      </header>
+      <section class="compatibility-card flow-card">
+        <h2>Notatka do raportu</h2>
+        <div class="flow-note-field">
+          <ice:outputLabel for="noteDraft" value="Treść notatki" />
+          <ice:inputTextarea id="noteDraft" value="#{reportBean.reportNoteDraft}" styleClass="flow-textarea"/>
+        </div>
+        <ice:outputText id="savedNote" value="Notatka zapisana: #{reportBean.savedReportNote}"
+                        rendered="#{reportBean.savedReportNote != null}" styleClass="flow-status"/>
+        <div class="flow-actions">
+          <ice:commandLink id="saveNote" action="saveNote" value="Zapisz notatkę"
+                           styleClass="flow-action flow-action-primary"/>
+          <ice:commandLink id="runReport" action="run" value="Run report" styleClass="flow-action"/>
+          <ice:commandLink id="failReport" action="fail" value="Force report error"
+                           styleClass="flow-action flow-action-danger"/>
+          <ice:commandLink id="skipReport" action="skip" value="Skip unavailable report" styleClass="flow-action"/>
+          <ice:commandLink id="cancelReport" action="cancel" value="Cancel report" styleClass="flow-action"/>
+        </div>
+      </section>
+    </main>
+  </ui:define>
+</ui:composition>

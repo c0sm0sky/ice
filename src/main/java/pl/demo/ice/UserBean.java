@@ -5,12 +5,12 @@ import pl.demo.ice.service.UserOperations;
 import pl.demo.ice.service.UserSummary;
 
 import javax.faces.context.FacesContext;
+import javax.faces.event.ActionEvent;
 import java.util.List;
 import java.util.Map;
 
 public class UserBean {
     private static final String CURRENT_PAGE_SESSION_KEY = "ice.currentPage";
-
     private UserOperations userService;
     private String login;
     private String haslo;
@@ -19,29 +19,7 @@ public class UserBean {
     private String loggedInName;
     private String editUserOriginalLogin;
     private String editUserPassword;
-
-    public void setUserService(UserOperations userService) { this.userService = userService; }
-    public String getLogin() { return login; }
-    public void setLogin(String login) { this.login = login; }
-    public String getHaslo() { return haslo; }
-    public void setHaslo(String haslo) { this.haslo = haslo; }
-    public String getMessage() { return message; }
-    public boolean isLoggedIn() { return loggedIn; }
-    public String getLoggedInName() { return loggedInName; }
-    public String getCurrentPageView() {
-        String page = "login";
-        FacesContext context = FacesContext.getCurrentInstance();
-        if (context != null) {
-            Object savedPage = context.getExternalContext().getSessionMap().get(CURRENT_PAGE_SESSION_KEY);
-            if (savedPage instanceof String) page = (String) savedPage;
-        }
-        if ("strona1".equals(page)) return "/strona1.xhtml";
-        if ("strona2".equals(page)) return "/strona2.xhtml";
-        return "/login.xhtml";
-    }
-    public List<UserSummary> getUsers() { return userService.findAll(); }
-    public String getEditUserPassword() { return editUserPassword; }
-    public void setEditUserPassword(String editUserPassword) { this.editUserPassword = editUserPassword; }
+    
 
     public String login() {
         User user = userService.authenticate(login, haslo);
@@ -51,6 +29,10 @@ public class UserBean {
         message = loggedIn ? null : "Nieprawidłowy login lub hasło.";
         setCurrentPage(loggedIn ? "strona1" : "login");
         return "login";
+    }
+
+    public void loginAction(ActionEvent event) {
+        login();
     }
 
     public String logout() {
@@ -63,6 +45,12 @@ public class UserBean {
         return "logout";
     }
 
+    public void logoutAction(ActionEvent event) { logout(); }
+
+    public String openReport() { return "openReport"; }
+    public String showCoverage() { return "showCoverage"; }
+    public String returnUsers() { return "users"; }
+
     public String editUser() {
         editUserOriginalLogin = parameterValue("userLogin");
         editUserPassword = null;
@@ -70,6 +58,8 @@ public class UserBean {
         setCurrentPage("strona2");
         return "editUser";
     }
+
+    public void editUserAction(ActionEvent event) { editUser(); }
 
     public String saveUser() {
         try {
@@ -85,12 +75,16 @@ public class UserBean {
         }
     }
 
+    public void saveUserAction(ActionEvent event) { saveUser(); }
+
     public String cancelUserEdit() {
         clearUserEdit();
         message = null;
         setCurrentPage("strona1");
         return "cancelUserEdit";
     }
+
+    public void cancelUserEditAction(ActionEvent event) { cancelUserEdit(); }
 
     private void clearUserEdit() {
         editUserOriginalLogin = null;
@@ -112,4 +106,42 @@ public class UserBean {
         }
         return value.trim();
     }
+
+    public String getCurrentPageView() {
+        String page = "login";
+        FacesContext context = FacesContext.getCurrentInstance();
+        if (context != null) {
+            Object savedPage = context.getExternalContext().getSessionMap().get(CURRENT_PAGE_SESSION_KEY);
+            if (savedPage instanceof String) page = (String) savedPage;
+        }
+        if ("strona1".equals(page)) return "/strona1.xhtml";
+        if ("strona2".equals(page)) return "/strona2.xhtml";
+        return "/login.xhtml";
+    }
+
+    // Getters and setters.
+    public void setUserService(UserOperations userService) { this.userService = userService; }
+
+    public String getLogin() { return login; }
+
+    public void setLogin(String login) { this.login = login; }
+
+    public String getHaslo() { return haslo; }
+
+    public void setHaslo(String haslo) { this.haslo = haslo; }
+
+    public String getMessage() { return message; }
+
+    public boolean isLoggedIn() { return loggedIn; }
+
+    public boolean isEditingUser() { return editUserOriginalLogin != null; }
+
+    public String getLoggedInName() { return loggedInName; }
+
+    public String getEditUserPassword() { return editUserPassword; }
+
+    public void setEditUserPassword(String editUserPassword) { this.editUserPassword = editUserPassword; }
+
+    public List<UserSummary> getUsers() { return userService.findAll(); }
+
 }

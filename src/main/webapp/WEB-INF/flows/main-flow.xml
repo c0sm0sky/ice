@@ -18,6 +18,8 @@
     <transition on="saveUser" to="users"/>
     <transition on="saveUserError" to="editUser"/>
     <transition on="cancelUserEdit" to="users"/>
+    <transition on="openReport" to="report"/>
+    <transition on="showCoverage" to="showCoverage"/>
   </view-state>
   <view-state id="login" view="/login.xhtml">
     <transition on="login" to="loginDecision"/>
@@ -27,8 +29,10 @@
   </decision-state>
 
   <view-state id="users" view="/strona1.xhtml">
+    <transition on="openReport" to="report"/>
     <transition on="editUser" to="editUser"/>
     <transition on="logout" to="login"/>
+    <transition on="showCoverage" to="showCoverage"/>
   </view-state>
 
   <view-state id="editUser" view="/strona2.xhtml">
@@ -36,4 +40,12 @@
     <transition on="saveUserError" to="editUser"/>
     <transition on="cancelUserEdit" to="users"/>
   </view-state>
+
+  <view-state id="showCoverage" view="/extras/coverage.xhtml">
+    <transition on="users" to="users"/>
+  </view-state>
+
+  <subflow-state id="report" flow="secondary-flow">
+    <transition on="finish" to="users"/>
+  </subflow-state>
 </flow>

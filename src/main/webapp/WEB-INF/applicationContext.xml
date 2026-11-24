@@ -8,68 +8,93 @@
          http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-2.0.xsd
          http://www.springframework.org/schema/webflow-config http://www.springframework.org/schema/webflow-config/spring-webflow-config-1.0.xsd">
 
-  <bean id="propertyConfigurer" class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
-    <property name="locations">
-      <list><value>classpath:ice.properties</value></list>
-    </property>
-    <property name="systemPropertiesModeName" value="SYSTEM_PROPERTIES_MODE_OVERRIDE"/>
-  </bean>
+    <bean id="propertyConfigurer" class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+        <property name="locations">
+            <list>
+                <value>classpath:ice.properties</value>
+            </list>
+        </property>
+        <property name="systemPropertiesModeName" value="SYSTEM_PROPERTIES_MODE_OVERRIDE"/>
+    </bean>
 
-  <bean id="dataSource" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close">
-    <property name="driverClassName" value="${ice.db.driver}"/>
-    <property name="url" value="${ice.db.url}"/>
-    <property name="username" value="${ice.db.username}"/>
-    <property name="password" value="${ice.db.password}"/>
-    <property name="maxActive" value="10"/>
-    <property name="maxIdle" value="5"/>
-    <property name="testOnBorrow" value="true"/>
-    <property name="validationQuery" value="SELECT 1"/>
-  </bean>
+    <bean id="dataSource" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close">
+        <property name="driverClassName" value="${ice.db.driver}"/>
+        <property name="url" value="${ice.db.url}"/>
+        <property name="username" value="${ice.db.username}"/>
+        <property name="password" value="${ice.db.password}"/>
+        <property name="maxActive" value="10"/>
+        <property name="maxIdle" value="5"/>
+        <property name="testOnBorrow" value="true"/>
+        <property name="validationQuery" value="SELECT 1"/>
+    </bean>
 
-  <bean id="sessionFactory" class="org.springframework.orm.hibernate3.LocalSessionFactoryBean">
-    <property name="dataSource" ref="dataSource"/>
-    <property name="mappingResources">
-      <list>
-        <value>pl/demo/ice/db/User.hbm.xml</value>
-      </list>
-    </property>
-    <property name="hibernateProperties">
-      <props>
-        <prop key="hibernate.dialect">org.hibernate.dialect.PostgreSQLDialect</prop>
-        <prop key="hibernate.hbm2ddl.auto">update</prop>
-        <prop key="hibernate.current_session_context_class">org.springframework.orm.hibernate3.SpringSessionContext</prop>
-        <prop key="hibernate.show_sql">false</prop>
-        <prop key="hibernate.format_sql">true</prop>
-      </props>
-    </property>
-  </bean>
+    <bean id="sessionFactory" class="org.springframework.orm.hibernate3.LocalSessionFactoryBean">
+        <property name="dataSource" ref="dataSource"/>
+        <property name="mappingResources">
+            <list>
+                <value>pl/demo/ice/db/User.hbm.xml</value>
+            </list>
+        </property>
+        <property name="hibernateProperties">
+            <props>
+                <prop key="hibernate.dialect">org.hibernate.dialect.PostgreSQLDialect</prop>
+                <prop key="hibernate.hbm2ddl.auto">update</prop>
+                <prop key="hibernate.current_session_context_class">
+                    org.springframework.orm.hibernate3.SpringSessionContext
+                </prop>
+                <prop key="hibernate.show_sql">false</prop>
+                <prop key="hibernate.format_sql">true</prop>
+            </props>
+        </property>
+    </bean>
 
-  <bean id="transactionManager" class="org.springframework.orm.hibernate3.HibernateTransactionManager">
-    <property name="sessionFactory" ref="sessionFactory"/>
-  </bean>
-  <tx:annotation-driven transaction-manager="transactionManager" proxy-target-class="false"/>
+    <bean id="transactionManager" class="org.springframework.orm.hibernate3.HibernateTransactionManager">
+        <property name="sessionFactory" ref="sessionFactory"/>
+    </bean>
+    <tx:annotation-driven transaction-manager="transactionManager" proxy-target-class="false"/>
 
-  <bean id="userDao" class="pl.demo.ice.db.UserDao">
-    <property name="sessionFactory" ref="sessionFactory"/>
-  </bean>
-  <bean id="userService" class="pl.demo.ice.service.UserService">
-    <property name="users" ref="userDao"/>
-  </bean>
+    <bean id="userDao" class="pl.demo.ice.db.UserDao">
+        <property name="sessionFactory" ref="sessionFactory"/>
+    </bean>
+    <bean id="userService" class="pl.demo.ice.service.UserService">
+        <property name="users" ref="userDao"/>
+    </bean>
 
-  <bean id="userBean" class="pl.demo.ice.UserBean" scope="session">
-    <property name="userService" ref="userService"/>
-  </bean>
+    <bean id="userBean" class="pl.demo.ice.UserBean" scope="session">
+        <property name="userService" ref="userService"/>
+    </bean>
 
-  <bean id="userDataInitializer" class="pl.demo.ice.db.UserDataInitializer" init-method="initialize">
-    <property name="sessionFactory" ref="sessionFactory"/>
-  </bean>
+    <bean id="componentsBean" class="pl.demo.ice.extras.ComponentsBean" scope="session">
+        <property name="userService" ref="userService"/>
+    </bean>
 
-  <flow:executor id="flowExecutor" registry-ref="flowRegistry" repository-type="simple">
-    <flow:execution-attributes>
-      <flow:alwaysRedirectOnPause value="false"/>
-    </flow:execution-attributes>
-  </flow:executor>
-  <flow:registry id="flowRegistry">
-    <flow:location path="/WEB-INF/flows/main-flow.xml"/>
-  </flow:registry>
+    <bean id="userDataInitializer" class="pl.demo.ice.db.UserDataInitializer" init-method="initialize">
+        <property name="sessionFactory" ref="sessionFactory"/>
+    </bean>
+
+    <bean id="reportBean" class="pl.demo.ice.extras.ReportBean" scope="session">
+        <property name="userService" ref="userService"/>
+    </bean>
+
+    <!-- Web Flow 1 caches Action objects in the flow definition. Resolve the session bean per invocation. -->
+    <bean id="reportFlowAction" class="org.springframework.aop.framework.ProxyFactoryBean">
+        <property name="proxyInterfaces" value="org.springframework.webflow.execution.Action"/>
+        <property name="targetSource">
+            <bean class="org.springframework.aop.target.SimpleBeanTargetSource">
+                <property name="targetBeanName" value="reportBean"/>
+            </bean>
+        </property>
+    </bean>
+
+    <flow:executor id="flowExecutor" registry-ref="flowRegistry" repository-type="simple">
+        <flow:execution-attributes>
+            <flow:alwaysRedirectOnPause value="false"/>
+        </flow:execution-attributes>
+    </flow:executor>
+
+    <flow:registry id="flowRegistry">
+        <flow:location path="/WEB-INF/flows/main-flow.xml"/>
+        <flow:location path="/WEB-INF/flows/extras/secondary-flow.xml"/>
+        <flow:location path="/WEB-INF/flows/extras/detail-flow.xml"/>
+    </flow:registry>
 </beans>

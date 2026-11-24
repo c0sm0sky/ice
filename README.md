@@ -49,14 +49,6 @@ Konfigurację PostgreSQL można nadpisać właściwościami systemowymi:
 
 Pierwsze uruchomienie tworzy tabelę `users` z kolumnami `id`, `login`, `haslo`, `imie` i `nazwisko` oraz konto `admin` / `admin`. Hibernate tworzy schemat na podstawie mapowania encji.
 
-## AJAX i widoki
-
-Widoki `login.xhtml`, `strona1.xhtml` i `strona2.xhtml` są klientami Facelets wspólnego `/WEB-INF/layouts/mainTemplate.xhtml`, obsługiwanymi przez `D2DFaceletViewHandler` z `icefaces-facelets`. Wszystkie strony korzystają z jednego własnego arkusza `resources/css/ice.css`. `strona1.xhtml` pokazuje tabelę loginów, imion i nazwisk z linkiem edycji; `strona2.xhtml` edytuje hasło. `UserBean` ma zakres sesji HTTP; `UserService` jest singletonem i zawiera logowanie, pobieranie listy i zmianę hasła. Template zawiera wspólny `ice:form` o id `mainForm`. ICEfaces utrzymuje jeden adres `.iface` i wysyła komendy AJAX.
-
-Tabela `users` przechowuje `id`, `login`, `haslo`, `imie` i `nazwisko`; hasło jest przechowywane jako tekst jawny. Aby uruchomić PostgreSQL od zera, wykonaj `docker compose down -v`, a potem `docker compose up -d postgres`.
-
-Plik `WEB-INF/jboss-deployment-structure.xml` wyłącza integrację JSF WildFly dla tej aplikacji, aby ładować do WAR-a wymagany JSF 1.1 zamiast serwerowego JSF 2.3.
-
 ## Eksperymentalna migracja ICEfaces do PrimeFaces
 Migracja jest odtwarzalna i nie zmienia źródłowego wariantu ICE. Wersje docelowe znajdują się w sekcji `<properties>` pliku `pom.xml` jako `migration.*`; recepty OpenRewrite są w `rewrite.yml`.
 

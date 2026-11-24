@@ -228,13 +228,16 @@ public final class UpgradeWebFlowConfiguration extends Recipe {
         }
 
         String registryRef = attribute(tag, "registry-ref");
+        String snapshots = "simple".equals(type) ? "0" : "30";
         Xml.Tag upgraded = setOnlyAttributes(rename(tag, "flow-executor"),
                 new String[][]{{"id", attribute(tag, "id")}, {"flow-registry", registryRef}});
 
         if (repository == null) {
-            Xml.Tag synthesized = Xml.Tag.build("<flow-execution-repository max-execution-snapshots=\"30\"/>");
+            Xml.Tag synthesized = Xml.Tag.build("<flow-execution-repository max-execution-snapshots=\""
+                    + snapshots + "\"/>");
             synthesized = rename(synthesized, qualifiedName(tag, "flow-execution-repository"));
-            List<Content> content = new ArrayList<>(upgraded.getContent());
+            List<Content> content = upgraded.getContent() == null
+                    ? new ArrayList<>() : new ArrayList<>(upgraded.getContent());
             int insertionPoint = 0;
             while (insertionPoint < content.size() && !(content.get(insertionPoint) instanceof Xml.Tag)) {
                 insertionPoint++;
@@ -243,7 +246,11 @@ public final class UpgradeWebFlowConfiguration extends Recipe {
                 content.add(charData("\n    "));
                 content.add(synthesized);
                 content.add(charData("\n  "));
-                upgraded = upgraded.withClosing(upgraded.getClosing().withBeforeTagDelimiterPrefix("\n"));
+                Xml.Tag.Closing closing = upgraded.getClosing();
+                if (closing == null) {
+                    closing = Xml.Tag.build("<" + upgraded.getName() + "></" + upgraded.getName() + ">").getClosing();
+                }
+                upgraded = upgraded.withClosing(closing);
             } else {
                 String indent = insertionPoint < content.size()
                         ? ((Xml.Tag) content.get(insertionPoint)).getPrefix() : "\n    ";
@@ -264,7 +271,7 @@ public final class UpgradeWebFlowConfiguration extends Recipe {
             throw new IllegalStateException("max-continuations można ustawić tylko dla repozytorium continuation.");
         }
         String snapshots = attribute(tag, "max-continuations");
-        if (snapshots == null) snapshots = "30";
+        if (snapshots == null) snapshots = "simple".equals(type) ? "0" : "30";
         String maxExecutions = attribute(tag, "max-conversations");
         String manager = attribute(tag, "conversation-manager-ref");
         if (maxExecutions != null && manager != null) {

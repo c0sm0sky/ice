@@ -55,6 +55,7 @@ public final class UpgradeMainFlowWithWebFlowUpgrader extends Recipe {
     }
 
     private static boolean isLegacyFlow(Xml.Tag root) {
+        if (root == null) return false;
         if (!"flow".equals(localName(root.getName()))) return false;
         if (root.getAttributes().stream().anyMatch(attribute -> "start-state".equals(attribute.getKeyAsString()))) {
             return false;

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <f:view xmlns:f="http://java.sun.com/jsf/core"
+        xmlns:h="http://java.sun.com/jsf/html"
         xmlns:ice="http://www.icesoft.com/icefaces/component"
         xmlns:ui="http://java.sun.com/jsf/facelets">
   <html>
@@ -7,7 +8,9 @@
       <title><ui:insert name="title">Ice</ui:insert></title>
       <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
       <meta name="viewport" content="width=device-width, initial-scale=1"/>
-      <ice:outputStyle href="./resources/css/ice.css"/>
+      <ice:outputStyle href="/xmlhttp/css/rime/rime.css"/>
+      <ice:outputStyle href="/resources/css/ice.css"/>
+      <script type="text/javascript" src="#{facesContext.externalContext.requestContextPath}/resources/js/login-keypress.js"></script>
     </head>
     <body>
       <ice:form id="mainForm">

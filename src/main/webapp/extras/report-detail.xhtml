@@ -1,0 +1,44 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:ui="http://java.sun.com/jsf/facelets"
+                xmlns:f="http://java.sun.com/jsf/core"
+                xmlns:ice="http://www.icesoft.com/icefaces/component"
+                template="/WEB-INF/layouts/mainTemplate.xhtml">
+  <ui:define name="title">Raport użytkowników</ui:define>
+  <ui:define name="mainPanel">
+    <main class="compatibility-page flow-page">
+      <header class="compatibility-header">
+        <div>
+          <p class="compatibility-eyebrow">Spring Web Flow · wynik</p>
+          <h1>Raport użytkowników</h1>
+          <p>Raport zawiera aktualne dane pobrane z bazy.</p>
+        </div>
+      </header>
+      <section class="compatibility-card flow-card">
+        <h2><ice:outputText value="Użytkownicy: #{reportBean.reportUserCount}" /></h2>
+        <ice:outputText value="Notatka: #{reportBean.savedReportNote}"
+                        rendered="#{reportBean.savedReportNote != null}" styleClass="flow-report-note" />
+        <ice:dataTable value="#{reportBean.reportUsers}" var="reportUser" styleClass="flow-report-table">
+          <ice:column>
+            <f:facet name="header"><ice:outputText value="Login" /></f:facet>
+            <ice:outputText value="#{reportUser.login}" />
+          </ice:column>
+          <ice:column>
+            <f:facet name="header"><ice:outputText value="Imię" /></f:facet>
+            <ice:outputText value="#{reportUser.imie}" />
+          </ice:column>
+          <ice:column>
+            <f:facet name="header"><ice:outputText value="Nazwisko" /></f:facet>
+            <ice:outputText value="#{reportUser.nazwisko}" />
+          </ice:column>
+        </ice:dataTable>
+        <div class="flow-actions">
+          <ice:outputResource id="downloadReport" resource="#{reportBean.reportResource}"
+                              attachment="true" fileName="raport-uzytkownikow.csv" mimeType="text/csv"
+                              label="Pobierz raport CSV" styleClass="flow-action flow-action-primary" />
+          <ice:commandLink id="finishReport" action="finish" value="Zakończ i wróć do użytkowników"
+                           styleClass="flow-action"/>
+        </div>
+      </section>
+    </main>
+  </ui:define>
+</ui:composition>

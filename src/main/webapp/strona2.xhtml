@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<ui:composition xmlns:ice="http://www.icesoft.com/icefaces/component"
+<ui:composition xmlns:f="http://java.sun.com/jsf/core"
+                xmlns:ice="http://www.icesoft.com/icefaces/component"
                 xmlns:ui="http://java.sun.com/jsf/facelets"
                 template="/WEB-INF/layouts/mainTemplate.xhtml">
-  <ui:define name="title">Ice | Edycja użytkownika</ui:define>
+  <!--@elvariable id="userBean" type="pl.demo.ice.UserBean"-->
+  <ui:define name="title">Edycja użytkownika</ui:define>
   <ui:define name="mainPanel">
     <div class="login-page">
       <main class="login-card">
@@ -14,8 +16,8 @@
           <ice:inputText id="password" value="#{userBean.editUserPassword}" styleClass="input"/>
         </div>
         <div class="user-actions">
-          <ice:commandButton value="Zapisz" action="#{userBean.saveUser}" styleClass="primary"/>
-          <ice:commandButton value="Anuluj" action="#{userBean.cancelUserEdit}" styleClass="secondary" immediate="true"/>
+          <ice:commandButton id="saveUser" value="Zapisz" action="#{userBean.saveUser}" styleClass="primary"/>
+          <ice:commandButton id="cancelUserEdit" value="Anuluj" action="#{userBean.cancelUserEdit}" styleClass="secondary" immediate="true"/>
         </div>
       </main>
     </div>

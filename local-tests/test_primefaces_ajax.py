@@ -8,7 +8,7 @@ import sys
 from html.parser import HTMLParser
 from http.cookiejar import CookieJar
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode, urljoin
+from urllib.parse import urlencode, urljoin, urlsplit
 from urllib.request import HTTPCookieProcessor, Request, build_opener
 from xml.etree import ElementTree
 
@@ -99,6 +99,34 @@ def main():
         if response.status != 200:
             raise AssertionError(f"{label}: HTTP {response.status}")
         root = ElementTree.fromstring(xml)
+        if root.tag != "partial-response":
+            raise AssertionError(f"{label}: expected a Faces partial response")
+        error = root.find("./error")
+        if error is not None:
+            raise AssertionError(f"{label}: Faces AJAX error: {''.join(error.itertext()).strip()}")
+        redirect = root.find("./redirect")
+        if redirect is not None:
+            location = redirect.get("url")
+            if not location:
+                raise AssertionError(f"{label}: Faces redirect has no URL")
+            target = urljoin(base_url, location)
+            parsed_target = urlsplit(target)
+            parsed_base = urlsplit(base_url)
+            if ((parsed_target.scheme, parsed_target.netloc, parsed_target.path.rstrip("/")) !=
+                    (parsed_base.scheme, parsed_base.netloc, parsed_base.path.rstrip("/"))
+                    or parsed_target.query or parsed_target.fragment):
+                raise AssertionError(f"{label}: Faces redirect leaves the application root: {target}")
+            redirected = request(target)
+            final_url = urlsplit(redirected.geturl())
+            if ((final_url.scheme, final_url.netloc, final_url.path.rstrip("/")) !=
+                    (parsed_base.scheme, parsed_base.netloc, parsed_base.path.rstrip("/"))
+                    or final_url.query or final_url.fragment):
+                raise AssertionError(f"{label}: redirect chain leaves the application root: {redirected.geturl()}")
+            html = redirected.read().decode("utf-8", "replace")
+            next_page = parse_page(html)
+            if not next_page.view_state:
+                raise AssertionError(f"{label}: redirected page has no Jakarta Faces ViewState")
+            return xml + html, next_page
         updates = {node.get("id"): node.text or "" for node in root.findall(".//update")}
         html = updates.get("mainForm", "")
         if not html:

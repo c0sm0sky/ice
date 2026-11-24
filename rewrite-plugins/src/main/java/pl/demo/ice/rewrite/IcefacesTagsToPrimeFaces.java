@@ -6,12 +6,15 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.ChangeTagAttribute;
 import org.openrewrite.xml.ChangeTagAttributeKey;
 import org.openrewrite.xml.ChangeTagName;
+import org.openrewrite.xml.AddTagAttribute;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
+import org.openrewrite.Option;
 
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -23,9 +26,19 @@ public final class IcefacesTagsToPrimeFaces extends Recipe {
     private static final String ICEFACES_TAGLIB = "META-INF/icefaces_component.tld";
     private static final String PRIMEFACES_TAGLIB = "META-INF/primefaces.taglib.xml";
     private static final String ICEFACES_PREFIX = "ice";
+    @Option(displayName = "Tags migrated by a later recipe",
+            description = "Classified structural migrations handled by a later recipe in the same migration.",
+            example = "outputResource")
+    public Set<String> tagsMigratedLater = Set.of();
+
+    public IcefacesTagsToPrimeFaces() {
+    }
+
+    public IcefacesTagsToPrimeFaces(Set<String> tagsMigratedLater) {
+        this.tagsMigratedLater = Set.copyOf(tagsMigratedLater);
+    }
     /** Komponenty bez rzetelnego zamiennika jeden do jednego; migracja podaje wskazówkę ręcznej przebudowy. */
     private static final Map<String, String> MANUAL_MIGRATIONS = Map.ofEntries(
-            Map.entry("commandSortHeader", "przenieś nagłówek sortujący do atrybutów p:column sortBy/sortOrder"),
             Map.entry("dataPaginator", "ustaw paginator i rows bezpośrednio na p:dataTable"),
             Map.entry("gMapControl", "przenieś ustawienia kontrolek do atrybutów/modelu p:gmap"),
             Map.entry("gMapDirection", "zastąp kierunki osobnym modelem i API mapy używanym przez p:gmap"),
@@ -48,6 +61,7 @@ public final class IcefacesTagsToPrimeFaces extends Recipe {
             Map.entry("setEventPhase", "przenieś obsługę do p:ajax i dobierz właściwy cykl przetwarzania JSF"),
             Map.entry("tabChangeListener", "obsłuż zmianę zakładki przez p:ajax event=tabChange"));
     private static final Map<String, String> JSF_AND_RENAMED_EQUIVALENTS = Map.ofEntries(
+            Map.entry("commandSortHeader", "h:panelGroup"),
             Map.entry("form", "h:form"),
             Map.entry("inputHidden", "h:inputHidden"),
             Map.entry("inputSecret", "p:password"),
@@ -119,8 +133,20 @@ public final class IcefacesTagsToPrimeFaces extends Recipe {
             throw new IllegalStateException("Taglib ICEfaces nie ma pełnej klasyfikacji. Nowe: " + unclassified
                     + "; nieaktualne: " + stale);
         }
+        if (!MANUAL_MIGRATIONS.keySet().containsAll(tagsMigratedLater)) {
+            Set<String> unsupportedOverrides = new LinkedHashSet<>(tagsMigratedLater);
+            unsupportedOverrides.removeAll(MANUAL_MIGRATIONS.keySet());
+            throw new IllegalStateException("Nie można odroczyć nieznanych tagów ICEfaces: " + unsupportedOverrides);
+        }
 
         List<Recipe> recipes = new java.util.ArrayList<>();
+        recipes.add(new MigrateIcefacesTableSorting());
+        Set<String> handledTags = new LinkedHashSet<>(mappings.keySet());
+        handledTags.addAll(tagsMigratedLater);
+        recipes.add(new FailOnUnmappedIcefacesTags(handledTags));
+        mappings.forEach((oldName, newName) -> recipes.add(
+                new ChangeTagName("//" + ICEFACES_PREFIX + ":" + oldName, newName)));
+        // Przepisz elementy, zanim zmienisz deklarację xmlns:ice; w przeciwnym razie XPath ice:* traci prefiks.
         recipes.add(new ChangeTagAttributeKey("//@xmlns:ice", "xmlns:p"));
         // Migracja Jakarta może wcześniej przepisać URI ICEfaces na wartość tymczasową "primefaces".
         // Ustawiamy docelowy URI bez warunku na poprzednią wartość.
@@ -128,9 +154,17 @@ public final class IcefacesTagsToPrimeFaces extends Recipe {
                 "http://primefaces.org/ui", null, false));
         recipes.add(new ChangeTagAttribute("//*[local-name()='composition']", "xmlns:p",
                 "http://primefaces.org/ui", null, false));
-        recipes.add(new FailOnUnmappedIcefacesTags(mappings.keySet()));
-        mappings.forEach((oldName, newName) -> recipes.add(
-                new ChangeTagName("//" + ICEFACES_PREFIX + ":" + oldName, newName)));
+        // ICEfaces command links submit through AJAX by default; preserve that behavior explicitly in PrimeFaces.
+        recipes.add(new AddTagAttribute("//p:commandLink", "ajax", "true"));
+        // ICEfaces menu items that invoke actions also migrate to AJAX PrimeFaces menu items.
+        recipes.add(new AddTagAttribute("//p:menuitem", "ajax", "true"));
+        // Tagi przenoszone do h:* potrzebują deklaracji Faces HTML także w stronach bez wcześniejszego xmlns:h.
+        recipes.add(new AddTagAttribute("//*[local-name()='composition']", "xmlns:h", "jakarta.faces.html"));
+        recipes.add(new AddTagAttribute("//*[local-name()='view']", "xmlns:h", "jakarta.faces.html"));
+        // Zamień statyczne ścieżki JSF resources/{library}/{name} na atrybuty biblioteki Faces.
+        recipes.add(new MigrateFacesResourceUrlsToLibrary());
+        // Zachowaj etykiety panelTab po zmianie ich na p:tab.
+        recipes.add(new ChangeTagAttributeKey("//p:tab/@label", "title"));
         return recipes;
     }
 
@@ -192,6 +226,72 @@ public final class IcefacesTagsToPrimeFaces extends Recipe {
     private static String localName(String tagName) {
         int colon = tagName.indexOf(':');
         return colon < 0 ? tagName : tagName.substring(colon + 1);
+    }
+
+    /** Converts JSF resource URLs into library/name references without assuming a particular library or file. */
+    private static final class MigrateFacesResourceUrlsToLibrary extends Recipe {
+        @Override
+        public String getDisplayName() {
+            return "Convert JSF resource URLs to library references";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Converts h:outputStylesheet href values under resources/{library}/{name} to library and name attributes.";
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor() {
+            return new XmlIsoVisitor<>() {
+                @Override
+                public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                    Xml.Tag updated = super.visitTag(tag, ctx);
+                    if (!"h:outputStylesheet".equals(updated.getName())) return updated;
+                    String href = updated.getAttributes().stream()
+                            .filter(attribute -> "href".equals(attribute.getKeyAsString()))
+                            .map(Xml.Attribute::getValueAsString)
+                            .findFirst().orElse(null);
+                    String[] resource = parseResourceUrl(href);
+                    if (resource == null) return updated;
+                    List<Xml.Attribute> attributes = new ArrayList<>(updated.getAttributes().size());
+                    for (Xml.Attribute attribute : updated.getAttributes()) {
+                        if (!"href".equals(attribute.getKeyAsString())) attributes.add(attribute);
+                    }
+                    updated = updated.withAttributes(attributes);
+                    updated = setAttribute(updated, "name", resource[1]);
+                    return setAttribute(updated, "library", resource[0]);
+                }
+            };
+        }
+
+        private static String[] parseResourceUrl(String href) {
+            if (href == null || href.contains("?") || href.contains("#")
+                    || href.contains("#{") || href.contains("${")) return null;
+            String path = href;
+            while (path.startsWith("../")) path = path.substring(3);
+            while (path.startsWith("./")) path = path.substring(2);
+            if (path.startsWith("/")) path = path.substring(1);
+            if (!path.startsWith("resources/")) return null;
+            String resourcePath = path.substring("resources/".length());
+            int separator = resourcePath.indexOf('/');
+            if (separator <= 0 || separator == resourcePath.length() - 1) return null;
+            return new String[]{resourcePath.substring(0, separator), resourcePath.substring(separator + 1)};
+        }
+
+        private static Xml.Tag setAttribute(Xml.Tag tag, String name, String value) {
+            List<Xml.Attribute> attributes = new ArrayList<>(tag.getAttributes());
+            for (int i = 0; i < attributes.size(); i++) {
+                if (name.equals(attributes.get(i).getKeyAsString())) {
+                    attributes.set(i, attributes.get(i).withValue(attributes.get(i).getValue().withValue(value)));
+                    return tag.withAttributes(attributes);
+                }
+            }
+            String escaped = value.replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;");
+            Xml.Attribute added = Xml.Tag.build("<holder " + name + "=\"" + escaped + "\"/>")
+                    .getAttributes().get(0).withPrefix(" ");
+            attributes.add(added);
+            return tag.withAttributes(attributes);
+        }
     }
 
     /** Stops the migration before the ICEfaces dependency is removed if a view uses an unmapped component. */

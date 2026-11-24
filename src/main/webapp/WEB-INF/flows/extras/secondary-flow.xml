@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<flow xmlns="http://www.springframework.org/schema/webflow"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.springframework.org/schema/webflow http://www.springframework.org/schema/webflow/spring-webflow-1.0.xsd">
+  <start-actions>
+    <action bean="reportFlowAction" method="initialize" />
+  </start-actions>
+  <start-state idref="chooseReport" />
+  <view-state id="chooseReport" view="/extras/report.xhtml">
+    <transition on="saveNote" to="saveNote" />
+    <transition on="run" to="prepareReport" />
+    <transition on="fail" to="failReport" />
+    <transition on="skip" to="markUnavailable" />
+    <transition on="cancel" to="finish" />
+  </view-state>
+  <action-state id="saveNote">
+    <action bean="reportFlowAction" method="saveNote" />
+    <transition on="success" to="chooseReport" />
+  </action-state>
+  <action-state id="markUnavailable">
+    <action bean="reportFlowAction" method="markUnavailable" />
+    <transition on="success" to="loadMetadata" />
+  </action-state>
+  <action-state id="failReport">
+    <action bean="reportFlowAction" method="fail" />
+    <transition on-exception="org.springframework.webflow.engine.ActionExecutionException" to="reportError" />
+  </action-state>
+  <action-state id="prepareReport">
+    <action bean="reportFlowAction" method="prepare" />
+    <transition on="success" to="loadMetadata" />
+    <transition on-exception="java.lang.Exception" to="reportError" />
+  </action-state>
+  <action-state id="reportDecision">
+    <action bean="reportFlowAction" method="selectReport" />
+    <transition on="available" to="showReport" />
+    <transition on="unavailable" to="finish" />
+  </action-state>
+  <action-state id="loadMetadata">
+    <action bean="reportFlowAction" method="loadMetadata" />
+    <transition on="success" to="reportDecision" />
+    <transition on="error" to="reportError" />
+  </action-state>
+  <subflow-state id="showReport" flow="detail-flow">
+    <transition on="finished" to="finish" />
+  </subflow-state>
+  <view-state id="reportError" view="/extras/report-error.xhtml">
+    <transition on="finish" to="finish" />
+  </view-state>
+  <end-state id="finish" />
+  <end-actions><bean-action bean="reportBean" method="releaseResources" /></end-actions>
+</flow>

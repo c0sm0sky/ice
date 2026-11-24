@@ -2,6 +2,9 @@ package pl.demo.ice;
 
 import org.springframework.webflow.config.FlowDefinitionResource;
 import org.springframework.webflow.config.FlowDefinitionResourceFactory;
+import org.springframework.webflow.engine.Flow;
+import org.springframework.webflow.engine.builder.FlowAssembler;
+import org.springframework.webflow.engine.builder.FlowBuilder;
 import org.springframework.webflow.conversation.impl.SessionBindingConversationManager;
 import org.springframework.webflow.core.collection.LocalAttributeMap;
 import org.springframework.webflow.definition.registry.FlowDefinitionRegistryImpl;
@@ -17,6 +20,7 @@ import org.springframework.webflow.engine.impl.FlowExecutionImplFactory;
 import org.springframework.webflow.test.MockExternalContext;
 import org.springframework.webflow.test.MockFlowBuilderContext;
 import org.springframework.webflow.test.execution.AbstractXmlFlowExecutionTests;
+import pl.demo.ice.extras.ReportBean;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -38,16 +42,41 @@ import java.util.Set;
 /** Executes the migrated flow definition through Spring Web Flow, without starting a server. */
 public class FlowMigrationRuntimeTest extends AbstractXmlFlowExecutionTests {
     private static final String FLOW_NS = "http://www.springframework.org/schema/webflow";
+    private static final String FLOW_DIR = "primefaces-migrated/target/prime/WEB-INF/flows/";
     private final UserBean userBean = new UserBean();
 
     @Override
     protected FlowDefinitionResource getResource(FlowDefinitionResourceFactory factory) {
-        return factory.createFileResource("primefaces-migrated/target/prime/WEB-INF/flows/main-flow.xml");
+        return factory.createFileResource(FLOW_DIR + "main-flow.xml");
+    }
+
+    @Override
+    protected FlowDefinitionResource[] getModelResources(FlowDefinitionResourceFactory factory) {
+        return new FlowDefinitionResource[] {
+                factory.createFileResource(FLOW_DIR + "main-flow.xml"),
+                factory.createFileResource(FLOW_DIR + "extras/secondary-flow.xml"),
+                factory.createFileResource(FLOW_DIR + "extras/detail-flow.xml")
+        };
     }
 
     @Override
     protected void configureFlowBuilderContext(MockFlowBuilderContext builderContext) {
         builderContext.registerBean("userBean", userBean);
+        ReportBean reportBean = new ReportBean();
+        builderContext.registerBean("reportBean", reportBean);
+        try {
+            FlowDefinitionResourceFactory factory = new FlowDefinitionResourceFactory();
+            Flow detail = assembleFlow(factory.createFileResource(FLOW_DIR + "extras/detail-flow.xml"),
+                    new MockFlowBuilderContext("detail-flow"));
+            MockFlowBuilderContext secondaryContext = new MockFlowBuilderContext("secondary-flow");
+            secondaryContext.registerBean("reportBean", reportBean);
+            secondaryContext.registerSubflow(detail);
+            Flow secondary = assembleFlow(factory.createFileResource(FLOW_DIR + "extras/secondary-flow.xml"),
+                    secondaryContext);
+            builderContext.registerSubflow(secondary);
+        } catch (Exception exception) {
+            throw new IllegalStateException("Cannot load migrated report subflows", exception);
+        }
     }
 
     public void testFlowContainsEveryPageAndActionTransition() throws Exception {
@@ -67,15 +96,51 @@ public class FlowMigrationRuntimeTest extends AbstractXmlFlowExecutionTests {
             }
         }
         assertEquals(new HashSet<String>(Arrays.asList(
-                "login", "loginDecision", "users", "editUser")), stateIds);
+                "login", "loginDecision", "users", "editUser", "showCoverage", "report")), stateIds);
 
         assertDecision(flow, "loginDecision", "userBean.loggedIn", "users", "login");
         assertTransition(flow, "login", "login", "loginDecision");
         assertTransition(flow, "users", "editUser", "editUser");
+        assertTransition(flow, "users", "openReport", "report");
+        assertTransition(flow, "users", "showCoverage", "showCoverage");
+        assertTransition(flow, "showCoverage", "users", "users");
         assertTransition(flow, "users", "logout", "login");
         assertTransition(flow, "editUser", "saveUser", "users");
         assertTransition(flow, "editUser", "saveUserError", "editUser");
         assertTransition(flow, "editUser", "cancelUserEdit", "users");
+    }
+
+    public void testReportSubflowCanBeOpenedAndCancelled() throws Exception {
+        MockExternalContext context = startLoggedInFlow(new FakeUserOperations());
+        context = event(context, "openReport");
+        assertCurrentStateEquals("chooseReport");
+        event(context, "cancel");
+        assertCurrentStateEquals("users");
+    }
+
+    public void testReportRunTraversesDetailFlowAndReturnsToUsers() throws Exception {
+        MockExternalContext context = startLoggedInFlow(new FakeUserOperations());
+        context = event(context, "openReport");
+        context = event(context, "run");
+        assertCurrentStateEquals("detail");
+        event(context, "finish");
+        assertCurrentStateEquals("users");
+    }
+
+    public void testReportFailureUsesErrorViewAndReturnsToUsers() throws Exception {
+        MockExternalContext context = startLoggedInFlow(new FakeUserOperations());
+        context = event(context, "openReport");
+        context = event(context, "fail");
+        assertCurrentStateEquals("reportError");
+        event(context, "finish");
+        assertCurrentStateEquals("users");
+    }
+
+    public void testUnavailableReportCanBeSkipped() throws Exception {
+        MockExternalContext context = startLoggedInFlow(new FakeUserOperations());
+        context = event(context, "openReport");
+        event(context, "skip");
+        assertCurrentStateEquals("users");
     }
 
     public void testLoginAndLogoutEventsMatchFlow() throws Exception {
@@ -228,6 +293,11 @@ public class FlowMigrationRuntimeTest extends AbstractXmlFlowExecutionTests {
         context = event(context, "login");
         assertCurrentStateEquals("users");
         return context;
+    }
+
+    private Flow assembleFlow(FlowDefinitionResource resource, MockFlowBuilderContext context) throws Exception {
+        FlowBuilder builder = createFlowBuilder(resource);
+        return new FlowAssembler(builder, context).assembleFlow();
     }
 
     private String currentState(FlowExecutionRepository repository, String executionKey,

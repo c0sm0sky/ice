@@ -1,0 +1,25 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:ui="http://java.sun.com/jsf/facelets"
+                xmlns:ice="http://www.icesoft.com/icefaces/component"
+                template="/WEB-INF/layouts/mainTemplate.xhtml">
+  <ui:define name="title">Błąd raportu</ui:define>
+  <ui:define name="mainPanel">
+    <main class="compatibility-page flow-page">
+      <header class="compatibility-header">
+        <div>
+          <p class="compatibility-eyebrow">Spring Web Flow · obsługa błędu</p>
+          <h1>Nie udało się przygotować raportu</h1>
+          <p>To widok błędu uruchamiany przez testową ścieżkę flow.</p>
+        </div>
+      </header>
+      <section class="compatibility-card flow-card flow-card-error">
+        <h2>Raport niedostępny</h2>
+        <ice:outputText value="Wystąpił testowy błąd przygotowania raportu." styleClass="flow-status" />
+        <div class="flow-actions">
+          <ice:commandLink id="returnFromReportError" action="finish" value="Wróć do użytkowników"
+                           styleClass="flow-action flow-action-primary"/>
+        </div>
+      </section>
+    </main>
+  </ui:define>
+</ui:composition>
