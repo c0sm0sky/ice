@@ -33,6 +33,7 @@
         <property name="mappingResources">
             <list>
                 <value>pl/demo/ice/db/User.hbm.xml</value>
+                <value>pl/demo/ice/db/Report.hbm.xml</value>
             </list>
         </property>
         <property name="hibernateProperties">
@@ -68,12 +69,17 @@
         <property name="userService" ref="userService"/>
     </bean>
 
-    <bean id="userDataInitializer" class="pl.demo.ice.db.UserDataInitializer" init-method="initialize">
+    <bean id="userDataInitializer" class="pl.demo.ice.db.DataInitializer" init-method="initialize">
+        <property name="sessionFactory" ref="sessionFactory"/>
+    </bean>
+
+    <bean id="reportDao" class="pl.demo.ice.db.ReportDao">
         <property name="sessionFactory" ref="sessionFactory"/>
     </bean>
 
     <bean id="reportBean" class="pl.demo.ice.extras.ReportBean" scope="session">
         <property name="userService" ref="userService"/>
+        <property name="reportDao" ref="reportDao"/>
     </bean>
 
     <!-- Web Flow 1 caches Action objects in the flow definition. Resolve the session bean per invocation. -->

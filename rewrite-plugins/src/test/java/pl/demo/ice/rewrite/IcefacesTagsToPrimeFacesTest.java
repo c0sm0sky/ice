@@ -18,7 +18,7 @@ import static org.openrewrite.xml.Assertions.xml;
 class IcefacesTagsToPrimeFacesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new IcefacesTagsToPrimeFaces());
+        spec.recipe(new IcefacesTagsToPrimeFaces(false));
     }
 
     @Test
@@ -33,7 +33,8 @@ class IcefacesTagsToPrimeFacesTest implements RewriteTest {
                 .toList();
 
         assertEquals(58, mappings.size());
-        assertEquals(69, recipeSteps.size());
+        assertEquals(68, recipeSteps.size());
+        assertTrue(recipeSteps.getFirst() instanceof MigrateIcefacesTableSorting);
         assertTrue(recipeSteps.stream().anyMatch(ChangeTagAttributeKey.class::isInstance));
         assertEquals(2, recipeSteps.stream().filter(ChangeTagAttribute.class::isInstance).count());
         ChangeTagAttribute primefacesNamespace = recipeSteps.stream()
@@ -71,7 +72,7 @@ class IcefacesTagsToPrimeFacesTest implements RewriteTest {
     void normalizesPrimefacesNamespaceAfterJakartaMigration() {
         rewriteRun(xml(
                 """
-                <ui:composition xmlns:p="primefaces" xmlns:ui="jakarta.faces.facelets">
+                <ui:composition xmlns:p="primefaces" xmlns:ui="jakarta.faces.facelets" xmlns:h="jakarta.faces.html">
                   <p:commandLink/>
                 </ui:composition>
                 """,
@@ -87,7 +88,7 @@ class IcefacesTagsToPrimeFacesTest implements RewriteTest {
     void migratesIceTagsAcrossFilesWhoseNamespaceWasAlreadyChangedByJakarta() {
         rewriteRun(xml(
                 """
-                <ui:composition xmlns:ice="primefaces" xmlns:ui="jakarta.faces.facelets">
+                <ui:composition xmlns:ice="primefaces" xmlns:ui="jakarta.faces.facelets" xmlns:h="jakarta.faces.html">
                   <ice:outputText value="Raport"/>
                   <ice:dataTable value="#{users}" var="user">
                     <ice:column><ice:outputText value="#{user.login}"/></ice:column>
@@ -111,7 +112,7 @@ class IcefacesTagsToPrimeFacesTest implements RewriteTest {
     void migratesTagsDeclaredWithTheRealIcefacesNamespace() {
         rewriteRun(xml(
                 """
-                <ui:composition xmlns:ice="http://www.icesoft.com/icefaces/component" xmlns:ui="jakarta.faces.facelets">
+                <ui:composition xmlns:ice="http://www.icesoft.com/icefaces/component" xmlns:ui="jakarta.faces.facelets" xmlns:h="jakarta.faces.html">
                   <ice:commandLink id="loginAction" actionListener="#{userBean.loginAction}"/>
                   <ice:outputText value="Login"/>
                 </ui:composition>
@@ -126,10 +127,46 @@ class IcefacesTagsToPrimeFacesTest implements RewriteTest {
     }
 
     @Test
+    void mapsSelectionMenuAndPreservesPartialSubmitForMigration() {
+        rewriteRun(xml(
+                """
+                <ui:composition xmlns:ice="http://www.icesoft.com/icefaces/component" xmlns:ui="jakarta.faces.facelets" xmlns:f="jakarta.faces.core" xmlns:h="jakarta.faces.html">
+                  <ice:selectOneMenu id="role" value="#{bean.role}" partialSubmit="true">
+                    <f:selectItems value="#{bean.roles}" />
+                  </ice:selectOneMenu>
+                </ui:composition>
+                """,
+                """
+                <ui:composition xmlns:p="http://primefaces.org/ui" xmlns:ui="jakarta.faces.facelets" xmlns:f="jakarta.faces.core" xmlns:h="jakarta.faces.html">
+                  <p:selectOneMenu id="role" value="#{bean.role}" partialSubmit="true">
+                    <f:selectItems value="#{bean.roles}" />
+                  </p:selectOneMenu>
+                </ui:composition>
+                """
+        ));
+    }
+
+    @Test
+    void mapsTextInputAndPreservesPartialSubmitForMigration() {
+        rewriteRun(xml(
+                """
+                <ui:composition xmlns:ice="http://www.icesoft.com/icefaces/component" xmlns:ui="jakarta.faces.facelets" xmlns:h="jakarta.faces.html">
+                  <ice:inputText id="query" value="#{bean.query}" partialSubmit="true" />
+                </ui:composition>
+                """,
+                """
+                <ui:composition xmlns:p="http://primefaces.org/ui" xmlns:ui="jakarta.faces.facelets" xmlns:h="jakarta.faces.html">
+                  <p:inputText id="query" value="#{bean.query}" partialSubmit="true" />
+                </ui:composition>
+                """
+        ));
+    }
+
+    @Test
     void migratesActionMenuItemsAsAjaxPrimeFacesMenuItems() {
         rewriteRun(xml(
                 """
-                <ui:composition xmlns:ice="http://www.icesoft.com/icefaces/component" xmlns:ui="jakarta.faces.facelets">
+                <ui:composition xmlns:ice="http://www.icesoft.com/icefaces/component" xmlns:ui="jakarta.faces.facelets" xmlns:h="jakarta.faces.html">
                   <ice:menuBar>
                     <ice:menuItem value="Użytkownicy" action="#{userBean.returnUsers}"/>
                   </ice:menuBar>
@@ -149,7 +186,7 @@ class IcefacesTagsToPrimeFacesTest implements RewriteTest {
     void preservesPanelTabLabelsAsPrimeFacesTabTitles() {
         rewriteRun(xml(
                 """
-                <ui:composition xmlns:ice="http://www.icesoft.com/icefaces/component" xmlns:ui="jakarta.faces.facelets">
+                <ui:composition xmlns:ice="http://www.icesoft.com/icefaces/component" xmlns:ui="jakarta.faces.facelets" xmlns:h="jakarta.faces.html">
                   <ice:panelTabSet>
                     <ice:panelTab label="Użytkownicy">Lista</ice:panelTab>
                     <ice:panelTab label="Profil">Dane</ice:panelTab>
@@ -171,7 +208,7 @@ class IcefacesTagsToPrimeFacesTest implements RewriteTest {
     void convertsNestedRelativeFacesResourcesToLibraryReferences() {
         rewriteRun(xml(
                 """
-                <ui:composition xmlns:ice="http://www.icesoft.com/icefaces/component" xmlns:ui="jakarta.faces.facelets">
+                <ui:composition xmlns:ice="http://www.icesoft.com/icefaces/component" xmlns:ui="jakarta.faces.facelets" xmlns:h="jakarta.faces.html">
                   <ice:outputStyle href="../resources/css/ice.css"/>
                 </ui:composition>
                 """,
@@ -185,9 +222,9 @@ class IcefacesTagsToPrimeFacesTest implements RewriteTest {
 
     @Test
     void allowsASeparateRecipeToHandleAClassifiedStructuralMigration() {
-        rewriteRun(spec -> spec.recipe(new IcefacesTagsToPrimeFaces(Set.of("outputResource"))), xml(
+        rewriteRun(spec -> spec.recipe(new IcefacesTagsToPrimeFaces(Set.of("outputResource"), false)), xml(
                 """
-                <ui:composition xmlns:ice="primefaces" xmlns:ui="jakarta.faces.facelets">
+                <ui:composition xmlns:ice="primefaces" xmlns:ui="jakarta.faces.facelets" xmlns:h="jakarta.faces.html">
                   <ice:outputResource id="downloadReport"/>
                   <ice:dataTable value="#{users}" var="user">
                     <ice:column><ice:outputText value="#{user.login}"/></ice:column>

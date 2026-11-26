@@ -4,6 +4,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.XmlIsoVisitor;
+import org.openrewrite.xml.ChangeTagAttribute;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Xml;
 import org.springframework.webflow.upgrade.WebFlowUpgrader;
@@ -12,6 +13,7 @@ import javax.xml.transform.stream.StreamResult;
 import javax.xml.transform.stream.StreamSource;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.util.List;
 
 /** Uruchamia oficjalny WebFlowUpgrader dla definicji Web Flow 1.x. */
 public final class UpgradeMainFlowWithWebFlowUpgrader extends Recipe {
@@ -24,7 +26,17 @@ public final class UpgradeMainFlowWithWebFlowUpgrader extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Runs Spring's WebFlowUpgrader on legacy flow XML before the Web Flow 4 normalization recipe.";
+        return "Runs Spring's WebFlowUpgrader on legacy flow XML and updates action exception references.";
+    }
+
+    @Override
+    public List<Recipe> getRecipeList() {
+        return List.of(new ChangeTagAttribute(
+                "//*[local-name()='transition']",
+                "on-exception",
+                "org.springframework.webflow.execution.ActionExecutionException",
+                "org.springframework.webflow.engine.ActionExecutionException",
+                false));
     }
 
     @Override

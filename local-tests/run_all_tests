@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+python_bin="${PYTHON:-python3}"
+count=0
+failed_tests=()
+
+for test_file in "$script_dir"/test_*.py; do
+    [[ -f "$test_file" ]] || continue
+    test_name="${test_file##*/}"
+    count=$((count + 1))
+    printf '\n=== %s ===\n' "$test_name"
+
+    if "$python_bin" "$test_file"; then
+        printf 'PASS %s\n' "$test_name"
+    else
+        result=$?
+        printf 'FAIL %s (exit %s)\n' "$test_name" "$result"
+        failed_tests+=("$test_name")
+    fi
+done
+
+if (( count == 0 )); then
+    printf 'No test_*.py files found in %s\n' "$script_dir" >&2
+    exit 2
+fi
+
+printf '\nRan %s local test files; %s failed.\n' "$count" "${#failed_tests[@]}"
+if (( ${#failed_tests[@]} > 0 )); then
+    printf 'Failed: %s\n' "${failed_tests[*]}"
+    exit 1
+fi

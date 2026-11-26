@@ -229,10 +229,11 @@
         <migration.spring-webflow.version>4.0.1</migration.spring-webflow.version>
         <migration.hibernate.version>7.4.16.Final</migration.hibernate.version>
         <migration.postgresql.version>42.7.14</migration.postgresql.version>
-        <migration.jakarta-faces.version>4.1.1</migration.jakarta-faces.version>
+        <migration.jakarta-faces.version>4.1.21</migration.jakarta-faces.version>
+        <migration.jakarta-faces-api.version>4.1.2</migration.jakarta-faces-api.version>
         <migration.jakarta-servlet.version>6.1.0</migration.jakarta-servlet.version>
         <migration.commons-dbcp.version>2.14.0</migration.commons-dbcp.version>
-        <migration.maven-compiler-plugin.version>3.14.1</migration.maven-compiler-plugin.version>
+        <migration.maven-compiler-plugin.version>3.16.0</migration.maven-compiler-plugin.version>
         <migration.maven-war-plugin.version>3.5.1</migration.maven-war-plugin.version>
         <migration.maven-clean-plugin.version>3.5.0</migration.maven-clean-plugin.version>
         <migration.maven-install-plugin.version>3.1.4</migration.maven-install-plugin.version>

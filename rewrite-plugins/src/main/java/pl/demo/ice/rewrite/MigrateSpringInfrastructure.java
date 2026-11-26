@@ -1,6 +1,7 @@
 package pl.demo.ice.rewrite;
 
 import org.openrewrite.Recipe;
+import org.openrewrite.Option;
 import org.openrewrite.xml.ChangeTagAttribute;
 import org.openrewrite.xml.ChangeTagValue;
 import org.openrewrite.xml.RemoveXmlTag;
@@ -8,7 +9,13 @@ import org.openrewrite.xml.RemoveXmlTag;
 import java.util.List;
 
 /** Migruje deklaracje Spring 2 i Hibernate 3 do konfiguracji zgodnej ze Spring Framework 5. */
-public final class UpgradeLegacySpringInfrastructure extends Recipe {
+public final class MigrateSpringInfrastructure extends Recipe {
+    @Option(displayName = "Migration phase", description = "Use legacy before the Spring upgrade and spring7 afterwards.", example = "legacy")
+    public String phase = "legacy";
+
+    public MigrateSpringInfrastructure() {}
+
+    public MigrateSpringInfrastructure(String phase) { this.phase = phase; }
     private static final String OLD_DBCP = "org.apache.commons.dbcp.BasicDataSource";
     private static final String NEW_DBCP = "org.apache.commons.dbcp2.BasicDataSource";
     private static final String OLD_SESSION_FACTORY = "org.springframework.orm.hibernate3.LocalSessionFactoryBean";
@@ -22,16 +29,18 @@ public final class UpgradeLegacySpringInfrastructure extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Upgrade legacy Spring infrastructure XML to Spring 5";
+        return "Migrate Spring infrastructure XML";
     }
 
     @Override
     public String getDescription() {
-        return "Migrates known DBCP and Spring 2/Hibernate 3 XML declarations to APIs available in Spring Framework 5.";
+        return "Migrates legacy Spring infrastructure and Spring ORM Hibernate integration in ordered phases.";
     }
 
     @Override
     public List<Recipe> getRecipeList() {
+        if ("spring7".equals(phase)) return spring7();
+        if (!"legacy".equals(phase)) throw new IllegalArgumentException("Unknown Spring migration phase: " + phase);
         return List.of(
                 new ChangeTagAttribute(beanClass(OLD_DBCP), "class", NEW_DBCP, OLD_DBCP, false),
                 new ChangeTagAttribute(beanClass(OLD_SESSION_FACTORY), "class", NEW_SESSION_FACTORY,
@@ -47,6 +56,19 @@ public final class UpgradeLegacySpringInfrastructure extends Recipe {
                         NEW_PLACEHOLDER_CONFIGURER, OLD_PLACEHOLDER_CONFIGURER, false),
                 new RemoveXmlTag("//*[local-name()='bean'][@class='" + NEW_PLACEHOLDER_CONFIGURER
                         + "']/*[local-name()='property'][@name='systemPropertiesModeName']", "**/*.xml")
+        );
+    }
+
+    private List<Recipe> spring7() {
+        return List.of(
+                new ChangeTagAttribute("//*[local-name()='bean'][@class='" + "org.springframework.orm.hibernate5."
+                        + "LocalSessionFactoryBean']", "class", "org.springframework.orm.jpa.hibernate." + "LocalSessionFactoryBean",
+                        "org.springframework.orm.hibernate5." + "LocalSessionFactoryBean", false),
+                new ChangeTagAttribute("//*[local-name()='bean'][@class='" + "org.springframework.orm.hibernate5."
+                        + "HibernateTransactionManager']", "class", "org.springframework.orm.jpa.hibernate." + "HibernateTransactionManager",
+                        "org.springframework.orm.hibernate5." + "HibernateTransactionManager", false),
+                new ChangeTagValue("//*[local-name()='prop'][@key='hibernate.current_session_context_class']",
+                        "org.springframework.orm.hibernate5." + "SpringSessionContext", "org.springframework.orm.jpa.hibernate." + "SpringSessionContext", false)
         );
     }
 

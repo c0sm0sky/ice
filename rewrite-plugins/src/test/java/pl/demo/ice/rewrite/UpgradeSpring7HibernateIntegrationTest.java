@@ -8,7 +8,7 @@ import static org.openrewrite.xml.Assertions.xml;
 class UpgradeSpring7HibernateIntegrationTest implements RewriteTest {
     @Override
     public void defaults(org.openrewrite.test.RecipeSpec spec) {
-        spec.recipe(new UpgradeSpring7HibernateIntegration());
+        spec.recipe(new MigrateSpringInfrastructure("spring7"));
     }
 
     @Test

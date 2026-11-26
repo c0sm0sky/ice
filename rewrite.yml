@@ -9,21 +9,20 @@ recipeList:
       servletVersion: '${migration.jakarta-servlet.version}'
   # Przekształca stare definicje Web Flow 1.x przed normalizacją przepływu aplikacji.
   - pl.demo.ice.rewrite.UpgradeMainFlowWithWebFlowUpgrader
-  # Przenosi sortowanie i dodaje stabilny cache do modelu beanów tabel ICEfaces.
-  - pl.demo.ice.rewrite.MigrateIcefacesTableSorting
-  # Zamienia używane w aplikacji znaczniki Facelets i atrybuty AJAX ICEfaces na PrimeFaces.
+  # Plugin mapuje tagi ICEfaces i migruje sortowanie/cache tabel dla całego projektu.
   - pl.demo.ice.migrate.IceComponentsToPrimeFaces
   # Widokami zarządza Web Flow; migrowany bean nie przechowuje już bieżącej strony w sesji.
   - pl.demo.ice.migrate.RemoveLegacyCurrentPageTracking
-  - pl.demo.ice.rewrite.MigrateWebFlowExceptionPackage
   - pl.demo.ice.migrate.InvokeReportCleanupMethod
-  - pl.demo.ice.migrate.NormalizeReportCleanupExpression
   - pl.demo.ice.migrate.RemoveLegacyReportActionProxy
-  - pl.demo.ice.migrate.FixPrimeFacesCompatibilityComponents
+  - pl.demo.ice.migrate.FixPrimeFacesCompatibilityXhtml
   - pl.demo.ice.migrate.ReportDownloadToPrimeFaces
   - pl.demo.ice.migrate.RemoveIcefacesRimeStylesheet
   # Aktualizuje beany DBCP, Hibernate, Spring i Web Flow w applicationContext.xml.
   - pl.demo.ice.migrate.ApplicationContextChanges
+  # Zmień pakiet Spring ORM, zanim tekstowe recepty spłaszczą XML do zwykłego tekstu.
+  - pl.demo.ice.rewrite.MigrateSpringInfrastructure:
+      phase: spring7
   - pl.demo.ice.migrate.RemovePrimeFacesRedirectOnPause
   - pl.demo.ice.migrate.ExplicitSubflowIds
   # Usuwa wycofane moduły Spring 2, zanim recepty podbiją wersje zależności.
@@ -32,11 +31,9 @@ recipeList:
   - org.openrewrite.java.spring.framework.UpgradeSpringFramework_7_0
   # Uruchamia oficjalną migrację i uniwersalne zmiany nazw metod Hibernate.
   - pl.demo.ice.rewrite.MigrateHibernateWithOfficialRecipes
-  # Ustawia pakiet Spring ORM dla Hibernate 7 po receptach upstream.
-  - pl.demo.ice.rewrite.UpgradeSpring7HibernateIntegration
-  - pl.demo.ice.migrate.MigrateSpring7HibernateIntegrationXml
   # Usuwa konfigurację serwletów ICEfaces i dodaje mapowania Jakarta Faces oraz Spring.
-  - pl.demo.ice.rewrite.RemoveIcefacesUploadServlet
+  - pl.demo.ice.rewrite.MigrateServletWebXml:
+      phase: upload
   - pl.demo.ice.migrate.WebXmlChanges
   - pl.demo.ice.migrate.ConfigurePrimeFacesTheme
   # Przekazuje żądania z głównego adresu do Web Flow i pozostawia generowane adresy flow w katalogu głównym.
@@ -52,25 +49,11 @@ recipeList:
       filePattern: src/main/webapp/WEB-INF/jboss-deployment-structure.xml
       modulesToUnexclude: javax.faces.api,javax.persistence.api,org.jboss.as.jsf,com.sun.jsf-impl
       subsystemsToUnexclude: jsf
-  # Ustawia kanoniczny URI PrimeFaces po wszystkich receptach Jakarta/JSF.
-  - pl.demo.ice.migrate.NormalizePrimeFacesNamespace
----
-type: specs.openrewrite.org/v1beta/recipe
-name: pl.demo.ice.migrate.NormalizePrimeFacesNamespace
-displayName: Normalize the PrimeFaces namespace URI
-description: Set the PrimeFaces tag-library URI after Jakarta and JSF migration recipes have run.
-preconditions:
-  - org.openrewrite.FindSourceFiles:
-      filePattern: src/main/webapp/**/*.xhtml
-recipeList:
-  - org.openrewrite.xml.ChangeTagAttribute:
-      elementName: "//*[local-name()='composition']"
-      attributeName: xmlns:p
-      newValue: http://primefaces.org/ui
-  - org.openrewrite.xml.ChangeTagAttribute:
-      elementName: "//*[local-name()='view']"
-      attributeName: xmlns:p
-      newValue: http://primefaces.org/ui
+  # Pełną migrację Faces uruchamiamy po zmianach XML i mapowaniu komponentów ICEfaces.
+  - pl.demo.ice.rewrite.MigrateJakartaToConfiguredServletVersion:
+      phase: faces-final
+  # Migracja działa w kopii przygotowanej przez profil, dzięki czemu legacy pozostaje na Javie 8.
+  - pl.demo.ice.rewrite.MigrateJava25
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: pl.demo.ice.migrate.RemoveLegacySpringModules
@@ -142,12 +125,6 @@ recipeList:
   - org.openrewrite.maven.RemoveProperty:
       propertyName: javassist.version
   - org.openrewrite.maven.ChangePropertyValue:
-      key: maven.compiler.source
-      newValue: '${migration.java.version}'
-  - org.openrewrite.maven.ChangePropertyValue:
-      key: maven.compiler.target
-      newValue: '${migration.java.version}'
-  - org.openrewrite.maven.ChangePropertyValue:
       key: spring.version
       newValue: '${migration.spring.version}'
   - org.openrewrite.maven.ChangePropertyValue:
@@ -178,7 +155,7 @@ recipeList:
   - org.openrewrite.maven.AddDependency:
       groupId: jakarta.faces
       artifactId: jakarta.faces-api
-      version: '${migration.jakarta-faces.version}'
+      version: '${migration.jakarta-faces-api.version}'
       scope: provided
   - org.openrewrite.maven.UpgradePluginVersion:
       groupId: org.apache.maven.plugins
@@ -295,9 +272,6 @@ type: specs.openrewrite.org/v1beta/recipe
 name: pl.demo.ice.migrate.IceComponentsToPrimeFaces
 displayName: Migrate ICEfaces XHTML components to PrimeFaces
 description: Convert known ICEfaces tags across Facelets pages and stop with a component-specific hint when a used tag needs structural or Java-model changes.
-preconditions:
-  - org.openrewrite.FindSourceFiles:
-      filePattern: src/main/webapp/**/*.xhtml
 recipeList:
   # Odczytuje deskryptory bibliotek, mapuje tagi i przełącza namespace ICEfaces na PrimeFaces.
   - pl.demo.ice.rewrite.IcefacesTagsToPrimeFaces:
@@ -535,7 +509,8 @@ recipeList:
   # Migruje elementy i atrybuty konfiguracji Web Flow 1.x do Web Flow 4.x.
   - pl.demo.ice.rewrite.UpgradeWebFlowConfiguration
   # Migruje deklaracje DBCP, Hibernate i konfiguratora placeholderów przez reguły pluginu.
-  - pl.demo.ice.rewrite.UpgradeLegacySpringInfrastructure
+  - pl.demo.ice.rewrite.MigrateSpringInfrastructure:
+      phase: legacy
   # Uzupełnia integrację Spring Faces i adresy schematów już w receptach Rewrite.
   - pl.demo.ice.rewrite.UpgradeSpringFacesIntegration
 ---
@@ -576,34 +551,6 @@ recipeList:
       replace: ''
 ---
 type: specs.openrewrite.org/v1beta/recipe
-name: pl.demo.ice.migrate.MigrateSpring7HibernateIntegrationXml
-displayName: Migrate Spring 7 Hibernate bean class names
-preconditions:
-  - org.openrewrite.FindSourceFiles:
-      filePattern: src/main/webapp/WEB-INF/applicationContext.xml
-recipeList:
-  - org.openrewrite.text.FindAndReplace:
-      find: 'org.springframework.orm.hibernate5.LocalSessionFactoryBean'
-      replace: 'org.springframework.orm.jpa.hibernate.LocalSessionFactoryBean'
-  - org.openrewrite.text.FindAndReplace:
-      find: 'org.springframework.orm.hibernate5.HibernateTransactionManager'
-      replace: 'org.springframework.orm.jpa.hibernate.HibernateTransactionManager'
-  - org.openrewrite.text.FindAndReplace:
-      find: 'org.springframework.orm.hibernate5.SpringSessionContext'
-      replace: 'org.springframework.orm.jpa.hibernate.SpringSessionContext'
----
-type: specs.openrewrite.org/v1beta/recipe
-name: pl.demo.ice.migrate.NormalizeReportCleanupExpression
-displayName: Invoke the report cleanup action in migrated flows
-preconditions:
-  - org.openrewrite.FindSourceFiles:
-      filePattern: src/main/webapp/WEB-INF/flows/extras/secondary-flow.xml
-recipeList:
-  - org.openrewrite.text.FindAndReplace:
-      find: 'expression="reportBean.releaseResources"'
-      replace: 'expression="reportBean.releaseResources()"'
----
-type: specs.openrewrite.org/v1beta/recipe
 name: pl.demo.ice.migrate.InvokeReportCleanupMethod
 displayName: Invoke the report cleanup method explicitly
 preconditions:
@@ -629,12 +576,6 @@ recipeList:
   - org.openrewrite.text.FindAndReplace:
       find: 'path="/flows/extras/detail-flow.xml"'
       replace: 'path="/flows/extras/detail-flow.xml" id="detail-flow"'
----
-type: specs.openrewrite.org/v1beta/recipe
-name: pl.demo.ice.migrate.FixPrimeFacesCompatibilityComponents
-displayName: Preserve the coverage page interactions in PrimeFaces
-recipeList:
-  - pl.demo.ice.migrate.FixPrimeFacesCompatibilityXhtml
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: pl.demo.ice.migrate.FixPrimeFacesCompatibilityXhtml
@@ -707,18 +648,6 @@ recipeList:
         $1    <h:outputText value="Drugi panel"/>
         $1  </p:splitterPanel>
         $1</p:splitter>
----
-type: specs.openrewrite.org/v1beta/recipe
-name: pl.demo.ice.migrate.RemovePrimeReportFlowVariable
-displayName: Use the injected session report bean in migrated flows
-preconditions:
-  - org.openrewrite.FindSourceFiles:
-      filePattern: src/main/webapp/WEB-INF/flows/extras/secondary-flow.xml
-recipeList:
-  - org.openrewrite.text.FindAndReplace:
-      find: '\s*<webflow:var name="reportBean" class="pl.demo.ice.extras.ReportBean"\s*/>'
-      regex: true
-      replace: ''
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: pl.demo.ice.migrate.ReportDownloadToPrimeFaces

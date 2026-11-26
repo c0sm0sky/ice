@@ -6,7 +6,9 @@ import static org.openrewrite.xml.Assertions.xml;
 
 class RemoveIcefacesUploadServletTest implements RewriteTest {
     @Override public void defaults(org.openrewrite.test.RecipeSpec spec) {
-        spec.recipe(new RemoveIcefacesUploadServlet());
+        MigrateServletWebXml recipe = new MigrateServletWebXml();
+        recipe.phase = "upload";
+        spec.recipe(recipe);
     }
 
     @Test void removesOnlyMatchingServletAndAllItsMappingsWithArbitraryNames() {

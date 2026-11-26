@@ -7,13 +7,19 @@ import org.openrewrite.xml.ChangeTagAttribute;
 import org.openrewrite.xml.ChangeTagAttributeKey;
 import org.openrewrite.xml.ChangeTagName;
 import org.openrewrite.xml.AddTagAttribute;
+import org.openrewrite.text.CreateTextFile;
+import org.openrewrite.text.FindAndReplace;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
+import org.openrewrite.xml.tree.Content;
 import org.openrewrite.Option;
 
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -21,20 +27,34 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** Buduje mapowania tagów na podstawie deskryptorów ICEfaces i PrimeFaces. */
+/** Migrates ICEfaces tags and their partial-submit behavior to PrimeFaces. */
 public final class IcefacesTagsToPrimeFaces extends Recipe {
     private static final String ICEFACES_TAGLIB = "META-INF/icefaces_component.tld";
     private static final String PRIMEFACES_TAGLIB = "META-INF/primefaces.taglib.xml";
     private static final String ICEFACES_PREFIX = "ice";
+    private static final String PARTIAL_SUBMIT_SCRIPT_RESOURCE = "/primefaces-partial-submit.js";
+    private static final String PARTIAL_SUBMIT_SCRIPT_PATH = "src/main/webapp/resources/js/primefaces-partial-submit.js";
+    private static final String MAIN_TEMPLATE_PATH = "src/main/webapp/WEB-INF/layouts/mainTemplate.xhtml";
+    private final boolean includePartialSubmitSupport;
     @Option(displayName = "Tags migrated by a later recipe",
             description = "Classified structural migrations handled by a later recipe in the same migration.",
             example = "outputResource")
     public Set<String> tagsMigratedLater = Set.of();
 
     public IcefacesTagsToPrimeFaces() {
+        this(true);
+    }
+
+    IcefacesTagsToPrimeFaces(boolean includePartialSubmitSupport) {
+        this.includePartialSubmitSupport = includePartialSubmitSupport;
     }
 
     public IcefacesTagsToPrimeFaces(Set<String> tagsMigratedLater) {
+        this(tagsMigratedLater, true);
+    }
+
+    IcefacesTagsToPrimeFaces(Set<String> tagsMigratedLater, boolean includePartialSubmitSupport) {
+        this(includePartialSubmitSupport);
         this.tagsMigratedLater = Set.copyOf(tagsMigratedLater);
     }
     /** Komponenty bez rzetelnego zamiennika jeden do jednego; migracja podaje wskazówkę ręcznej przebudowy. */
@@ -97,12 +117,12 @@ public final class IcefacesTagsToPrimeFaces extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Migrate ICEfaces tags to PrimeFaces and Jakarta Faces";
+        return "Migrate ICEfaces tags and partial submits to PrimeFaces";
     }
 
     @Override
     public String getDescription() {
-        return "Derives same-name mappings from the ICEfaces and PrimeFaces tag libraries, applies known tag aliases, and stops on components requiring structural or Java-bean migration.";
+        return "Maps ICEfaces tags to PrimeFaces and Jakarta Faces, migrates partialSubmit behavior, installs its runtime script, and stops on components requiring structural or Java-bean migration.";
     }
 
     @Override
@@ -158,13 +178,13 @@ public final class IcefacesTagsToPrimeFaces extends Recipe {
         recipes.add(new AddTagAttribute("//p:commandLink", "ajax", "true"));
         // ICEfaces menu items that invoke actions also migrate to AJAX PrimeFaces menu items.
         recipes.add(new AddTagAttribute("//p:menuitem", "ajax", "true"));
-        // Tagi przenoszone do h:* potrzebują deklaracji Faces HTML także w stronach bez wcześniejszego xmlns:h.
-        recipes.add(new AddTagAttribute("//*[local-name()='composition']", "xmlns:h", "jakarta.faces.html"));
-        recipes.add(new AddTagAttribute("//*[local-name()='view']", "xmlns:h", "jakarta.faces.html"));
         // Zamień statyczne ścieżki JSF resources/{library}/{name} na atrybuty biblioteki Faces.
         recipes.add(new MigrateFacesResourceUrlsToLibrary());
         // Zachowaj etykiety panelTab po zmianie ich na p:tab.
         recipes.add(new ChangeTagAttributeKey("//p:tab/@label", "title"));
+        if (includePartialSubmitSupport) {
+            recipes.add(new PartialSubmitSupport());
+        }
         return recipes;
     }
 
@@ -226,6 +246,103 @@ public final class IcefacesTagsToPrimeFaces extends Recipe {
     private static String localName(String tagName) {
         int colon = tagName.indexOf(':');
         return colon < 0 ? tagName : tagName.substring(colon + 1);
+    }
+
+    /** Migrates partialSubmit on PrimeFaces components and installs its shared client runtime. */
+    private static final class PartialSubmitSupport extends Recipe {
+        private static final Set<String> EDITABLE = Set.of("selectOneMenu", "selectOneListbox",
+                "selectManyListbox", "selectOneRadio", "selectManyCheckbox", "selectBooleanCheckbox",
+                "inputText", "inputTextarea", "inputSecret", "password", "datePicker", "autoComplete");
+
+        @Override
+        public String getDisplayName() {
+            return "Migrate ICEfaces partialSubmit behavior to PrimeFaces AJAX";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Migrates partialSubmit to PrimeFaces AJAX, installs the shared input-preservation script, and includes it in the main template.";
+        }
+
+        @Override
+        public List<Recipe> getRecipeList() {
+            try (InputStream resource = IcefacesTagsToPrimeFaces.class
+                    .getResourceAsStream(PARTIAL_SUBMIT_SCRIPT_RESOURCE)) {
+                if (resource == null) {
+                    throw new IllegalStateException("Missing recipe resource: " + PARTIAL_SUBMIT_SCRIPT_RESOURCE);
+                }
+                String script = new String(resource.readAllBytes(), StandardCharsets.UTF_8);
+                String templateReplacement = "<h:outputScript library=\"js\" name=\"primefaces-partial-submit.js\" target=\"head\" />\n            </h:head>";
+                return List.of(
+                        new CreateTextFile(script, PARTIAL_SUBMIT_SCRIPT_PATH, false),
+                        new FindAndReplace("</h:head>", templateReplacement, null, null, null, null,
+                                MAIN_TEMPLATE_PATH, null)
+                );
+            } catch (IOException e) {
+                throw new UncheckedIOException("Cannot read recipe resource: " + PARTIAL_SUBMIT_SCRIPT_RESOURCE, e);
+            }
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor() {
+            return new XmlIsoVisitor<>() {
+                @Override
+                public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                    Xml.Tag updated = super.visitTag(tag, ctx);
+                    if (!(updated.getName().startsWith("p:") || updated.getName().startsWith("h:"))
+                            || !EDITABLE.contains(localName(updated.getName()))
+                            || !"true".equals(attribute(updated, "partialSubmit"))) {
+                        return updated;
+                    }
+
+                    updated = withoutAttribute(updated, "partialSubmit");
+                    boolean alreadyHasAjax = updated.getChildren().stream()
+                            .anyMatch(child -> "ajax".equals(localName(child.getName()))
+                                    && child.getName().startsWith("p:"));
+                    return alreadyHasAjax ? updated : appendChild(updated,
+                            Xml.Tag.build("<p:ajax process=\"@this\" update=\"@form\" onstart=\"PrimeFacesPartialSubmit.capture(cfg.source)\" oncomplete=\"PrimeFacesPartialSubmit.restore()\" onerror=\"PrimeFacesPartialSubmit.clear()\" />"));
+                }
+            };
+        }
+
+        private static Xml.Tag withoutAttribute(Xml.Tag tag, String name) {
+            List<Xml.Attribute> attributes = new ArrayList<>(tag.getAttributes().size());
+            boolean changed = false;
+            for (Xml.Attribute attribute : tag.getAttributes()) {
+                if (name.equals(localName(attribute.getKeyAsString()))) changed = true;
+                else attributes.add(attribute);
+            }
+            return changed ? tag.withAttributes(attributes) : tag;
+        }
+
+        private static Xml.Tag appendChild(Xml.Tag parent, Xml.Tag child) {
+            List<Content> content = parent.getContent() == null
+                    ? new ArrayList<>() : new ArrayList<>(parent.getContent());
+            if (content.isEmpty()) {
+                String indent = parent.getPrefix().isBlank() ? "\n  " : parent.getPrefix();
+                Xml.Tag.Closing closing = parent.getClosing();
+                if (closing == null) {
+                    closing = Xml.Tag.build("<holder></holder>").getClosing().withName(parent.getName());
+                }
+                content.add(child.withPrefix(indent + "  "));
+                return parent.withContent(content).withClosing(closing.withPrefix(indent));
+            }
+
+            String indent = parent.getChildren().isEmpty()
+                    ? "\n    " : parent.getChildren().getLast().getPrefix();
+            int insertionPoint = content.size();
+            if (content.get(insertionPoint - 1) instanceof Xml.CharData data && data.getText().isBlank()) {
+                insertionPoint--;
+            }
+            content.add(insertionPoint, child.withPrefix(indent));
+            return parent.withContent(content);
+        }
+
+        private static String attribute(Xml.Tag tag, String name) {
+            return tag.getAttributes().stream()
+                    .filter(attribute -> name.equals(localName(attribute.getKeyAsString())))
+                    .map(Xml.Attribute::getValueAsString).findFirst().orElse(null);
+        }
     }
 
     /** Converts JSF resource URLs into library/name references without assuming a particular library or file. */

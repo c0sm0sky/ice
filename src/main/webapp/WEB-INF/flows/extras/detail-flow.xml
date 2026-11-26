@@ -5,6 +5,8 @@
   <start-state idref="detail" />
   <view-state id="detail" view="/extras/report-detail.xhtml">
     <transition on="finish" to="finished" />
+    <transition on="back" to="backToSelection" />
   </view-state>
   <end-state id="finished" />
+  <end-state id="backToSelection" />
 </flow>

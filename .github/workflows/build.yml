@@ -3,11 +3,14 @@ name: Build WAR
 on:
   push:
     branches: [main]
+    tags: ['*']
   pull_request:
   workflow_dispatch:
+  release:
+    types: [published]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   war:
@@ -68,3 +71,23 @@ jobs:
           name: prime-migration-war
           path: primefaces-migrated/target/prime.war
           if-no-files-found: error
+
+
+  publish-release-wars:
+    name: Attach WARs to GitHub Release
+    if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')
+    needs: [war, primefaces-migration]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download built WARs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: '*-war'
+          path: dist
+          merge-multiple: true
+
+      - name: Upload WARs to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.war
+          fail_on_unmatched_files: true

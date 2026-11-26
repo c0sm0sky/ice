@@ -318,10 +318,20 @@ def main():
             check_link_style(ACTION_SELECTORS["run_report"], "run report link")
             check_link_style(ACTION_SELECTORS["save_note"], "save note link")
 
+            owner_choice = page.locator('select[id$=":reportOwner"]')
+            for login in ("alice", "bob", "admin", "alice", "admin"):
+                option = owner_choice.locator("option").filter(has_text=login).first
+                owner_choice.select_option(value=option.get_attribute("value"))
+                page.wait_for_function("login => [...document.querySelectorAll('.flow-status')].some(e => e.textContent.trim() === 'Właściciel: ' + login)", arg=login)
+                check(page.locator(".flow-status").filter(has_text="Właściciel: " + login).count() == 1,
+                      "ICE owner label updates to " + login)
+
             note_text = "Notatka zapisana przez flow"
             page.locator('textarea[id$=":noteDraft"]').fill(note_text)
             ajax("save note through flow", page.locator(ACTION_SELECTORS["save_note"]), note_text)
             check(note_text in page.locator("body").inner_text(), "saved note remains after flow action")
+            unsaved_note = "Niezapisana zmiana notatki"
+            page.locator('textarea[id$=":noteDraft"]').fill(unsaved_note)
 
             ajax("run report", page.locator(ACTION_SELECTORS["run_report"]), "Raport użytkowników")
             check_flow_style("report result is styled")
@@ -332,12 +342,56 @@ def main():
             check(report_rows.count() > 0 and "admin" in report_text,
                   "report displays database users", repr(report_text[:300]))
             check(note_text in page.locator("body").inner_text(), "report displays saved note")
+            check(unsaved_note not in page.locator("body").inner_text(),
+                  "running report does not save note draft")
             with page.expect_download(timeout=10_000) as report_download:
                 page.locator(ACTION_SELECTORS["download_report"]).click()
             download = report_download.value
             csv_content = pathlib.Path(download.path()).read_text(encoding="utf-8-sig")
             check(download.suggested_filename == "raport-uzytkownikow.csv", "ICEfaces report download has filename")
             check('"admin"' in csv_content and "Admin" in csv_content, "downloaded CSV contains report data")
+            check(f'Notatka,"{note_text}"' in csv_content and unsaved_note not in csv_content,
+                  "downloaded CSV contains saved note instead of draft")
+            ajax("return to report selection", page.locator(ACTION_SELECTORS["back_to_report_list"]), "Run report")
+            check("Dostępne raporty" in page.locator("body").inner_text()
+                  and "admin" in page.locator("body").inner_text().lower(),
+                  "report selection returns with database entries and owner")
+            owner_choice = page.locator('select[id$=":reportOwner"]')
+            owner_choice.select_option(label="admin — Admin Systemu")
+            report_choice = page.locator('select[id$=":reportChoice"]')
+            report_choice.select_option(label="Profil użytkownika")
+            ajax("run user profile", page.locator(ACTION_SELECTORS["run_report"]), "Rekordy raportu")
+            check(page.locator(".flow-report-table tbody tr").count() == 1
+                  and "admin" in page.locator(".flow-report-table").inner_text(),
+                  "profile report shows its owner's row")
+            with page.expect_download(timeout=10_000) as profile_download:
+                page.locator(ACTION_SELECTORS["download_report"]).click()
+            profile_csv = pathlib.Path(profile_download.value.path()).read_text(encoding="utf-8-sig")
+            profile_headers = [header.inner_text().strip() for header in page.locator(".flow-report-table thead th").all()]
+            check('"admin"' in profile_csv and "Admin" in profile_csv
+                  and f'Notatka,"{note_text}"' in profile_csv and ",".join(profile_headers) in profile_csv
+                  and "Notatka" not in profile_headers,
+                  "profile CSV matches table headers, owner data and note")
+            ajax("return from profile to report selection", page.locator(ACTION_SELECTORS["back_to_report_list"]), "Run report")
+            page.locator('select[id$=":reportOwner"]').select_option(label="admin — Admin Systemu")
+            report_choice = page.locator('select[id$=":reportChoice"]')
+            report_choice.select_option(label="Raporty użytkownika")
+            ajax("run user's reports", page.locator(ACTION_SELECTORS["run_report"]), "Raporty przypisane użytkownikowi: admin")
+            assigned_rows = page.locator(".flow-report-table tbody tr")
+            check(assigned_rows.count() == 2 and "Profil użytkownika" in assigned_rows.nth(0).inner_text(),
+                  "user report shows only reports assigned to that user")
+            with page.expect_download(timeout=10_000) as assigned_download:
+                page.locator(ACTION_SELECTORS["download_report"]).click()
+            assigned_csv = pathlib.Path(assigned_download.value.path()).read_text(encoding="utf-8-sig")
+            assigned_headers = [header.inner_text().strip() for header in page.locator(".flow-report-table thead th").all()]
+            check("Profil użytkownika" in assigned_csv and "Raporty użytkownika" in assigned_csv
+                  and f'Notatka,"{note_text}"' in assigned_csv
+                  and ",".join(assigned_headers) in assigned_csv and "Notatka" not in assigned_headers,
+                  "assigned-report CSV matches table headers, rows and note")
+            ajax("return from user reports to report selection", page.locator(ACTION_SELECTORS["back_to_report_list"]), "Run report")
+            page.locator('select[id$=":reportOwner"]').select_option(label="admin — Admin Systemu")
+            page.locator('select[id$=":reportChoice"]').select_option(label="Profil użytkownika")
+            ajax("reopen report from report list", page.locator(ACTION_SELECTORS["run_report"]), "Raport użytkowników")
             ajax("finish report", page.locator(ACTION_SELECTORS["finish_report"]),
                         "Użytkownicy")
             page.goto(base_url, wait_until="domcontentloaded")

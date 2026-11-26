@@ -24,6 +24,7 @@ ACTION_SELECTORS = {
     "run_report": "#mainForm\\:runReport",
     "download_report": "#mainForm\\:downloadReport",
     "finish_report": "#mainForm\\:finishReport",
+    "back_to_report_list": "#mainForm\\:backToReportList",
     "fail_report": "#mainForm\\:failReport",
     "return_from_report_error": "#mainForm\\:returnFromReportError",
     "skip_report": "#mainForm\\:skipReport",

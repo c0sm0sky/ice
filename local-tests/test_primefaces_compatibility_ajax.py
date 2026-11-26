@@ -109,6 +109,22 @@ def main():
             }""")
             check(styled, label + " has shared button style")
 
+        def select_report_owner(locator, label):
+            target = locator.locator("option").filter(has_text=label).get_attribute("value")
+            if locator.input_value() == target:
+                return
+            source = locator.get_attribute("id").replace("_input", "")
+
+            def owner_change(response):
+                request = response.request
+                if request.method != "POST" or request.headers.get("faces-request", "").lower() != "partial/ajax":
+                    return False
+                fields = parse_qs(request.post_data or "")
+                return fields.get("jakarta.faces.source", fields.get("javax.faces.source", [])) == [source]
+
+            with page.expect_response(owner_change, timeout=10_000):
+                locator.select_option(value=target)
+
         def check_navigation_layout():
             for selector, title in ((ACTION_SELECTORS["open_coverage"], "Komponenty"),
                                     (ACTION_SELECTORS["open_report"], "Dodatkowy flow")):
@@ -399,10 +415,48 @@ def main():
             check_flow_style("report flow is styled")
             check_link_style(ACTION_SELECTORS["run_report"], "run report link")
             check_link_style(ACTION_SELECTORS["save_note"], "save note link")
+            owner_choice = page.locator("select").nth(0)
+            report_choice = page.locator("select").nth(1)
+            note_draft = page.locator('textarea[id$=":noteDraft"]')
+            draft_text = "Niezapisany szkic podczas zmiany właściciela"
+            note_draft.fill(draft_text)
+            previous_report_values = report_choice.locator("option").evaluate_all(
+                "options => options.map(option => option.value)"
+            )
+            select_report_owner(owner_choice, "alice")
+            page.wait_for_function("""previous => {
+                const select = document.querySelector('select[id$=\\":reportChoice_input\\"]');
+                return select && [...select.options].map(option => option.value).join('|') !== previous.join('|');
+            }""", arg=previous_report_values)
+            check(note_draft.input_value() == draft_text,
+                  "owner AJAX preserves unsaved textarea draft")
+            refreshed_report_values = report_choice.locator("option").evaluate_all(
+                "options => options.map(option => option.value)"
+            )
+            check(len(refreshed_report_values) > 1
+                  and refreshed_report_values != previous_report_values
+                  and report_choice.input_value() in refreshed_report_values,
+                  "owner AJAX refreshes and selects that owner's reports",
+                  f"values={refreshed_report_values}, selected={report_choice.input_value()}")
+            page.wait_for_function("() => [...document.querySelectorAll('.flow-status')].some(e => e.textContent.trim() === 'Właściciel: alice')")
+            check(page.locator(".flow-status").filter(has_text="Właściciel: alice").count() == 1,
+                  "owner label updates to alice")
+            select_report_owner(owner_choice, "bob")
+            page.wait_for_function("() => [...document.querySelectorAll('.flow-status')].some(e => e.textContent.trim() === 'Właściciel: bob')")
+            check(page.locator(".flow-status").filter(has_text="Właściciel: bob").count() == 1,
+                  "owner label updates to bob")
+            select_report_owner(owner_choice, "admin — Admin Systemu")
+            page.wait_for_function("() => [...document.querySelectorAll('.flow-status')].some(e => e.textContent.trim() === 'Właściciel: admin')")
+            check(page.locator(".flow-status").filter(has_text="Właściciel: admin").count() == 1,
+                  "owner label updates to admin")
+            check(note_draft.input_value() == draft_text,
+                  "second owner AJAX preserves unsaved textarea draft")
             note_text = "Notatka zapisana przez flow"
-            page.locator('textarea[id$=":noteDraft"]').fill(note_text)
+            note_draft.fill(note_text)
             ajax("save note through flow AJAX", page.locator(ACTION_SELECTORS["save_note"]), note_text)
             check(note_text in page.locator("body").inner_text(), "saved note remains after flow action")
+            unsaved_note = "Niezapisana zmiana notatki"
+            note_draft.fill(unsaved_note)
             ajax("run report AJAX", page.locator(ACTION_SELECTORS["run_report"]), "Raport użytkowników")
             check_flow_style("report result is styled")
             check_link_style(ACTION_SELECTORS["download_report"], "download report link")
@@ -411,12 +465,58 @@ def main():
             report_text = report_table.inner_text()
             check(report_table.locator("tbody tr").count() > 0 and "admin" in report_text
                   and note_text in page.locator("body").inner_text(), "report displays database rows and note")
+            check(unsaved_note not in page.locator("body").inner_text(),
+                  "running report does not save note draft")
             with page.expect_download(timeout=10_000) as download_info:
                 page.locator(ACTION_SELECTORS["download_report"]).click()
             download = download_info.value
             csv_content = pathlib.Path(download.path()).read_text(encoding="utf-8-sig")
             check(download.suggested_filename == "raport-uzytkownikow.csv", "report download has filename")
             check('"admin"' in csv_content and "Admin" in csv_content, "downloaded CSV contains report data")
+            check(f'Notatka,"{note_text}"' in csv_content and unsaved_note not in csv_content,
+                  "downloaded CSV contains saved note instead of draft")
+            ajax("return to report selection AJAX", page.locator(ACTION_SELECTORS["back_to_report_list"]), "Run report")
+            check("Dostępne raporty" in page.locator("body").inner_text()
+                  and "admin" in page.locator("body").inner_text().lower(),
+                  "report selection returns with database entries and owner")
+            owner_choice = page.locator("select").nth(0)
+            select_report_owner(owner_choice, "admin — Admin Systemu")
+            report_choice = page.locator("select").nth(1)
+            report_choice.select_option(label="Profil użytkownika")
+            ajax("run user profile AJAX", page.locator(ACTION_SELECTORS["run_report"]), "Rekordy raportu")
+            check(page.locator(".flow-report-table tbody tr").count() == 1
+                  and "admin" in page.locator(".flow-report-table").inner_text(),
+                  "profile report shows its owner's row")
+            with page.expect_download(timeout=10_000) as profile_download:
+                page.locator(ACTION_SELECTORS["download_report"]).click()
+            profile_csv = pathlib.Path(profile_download.value.path()).read_text(encoding="utf-8-sig")
+            profile_headers = [header.inner_text().strip() for header in page.locator(".flow-report-table thead th").all()]
+            check('"admin"' in profile_csv and "Admin" in profile_csv
+                  and f'Notatka,"{note_text}"' in profile_csv and ",".join(profile_headers) in profile_csv
+                  and "Notatka" not in profile_headers,
+                  "profile CSV matches table headers, owner data and note")
+            ajax("return from profile to report selection AJAX", page.locator(ACTION_SELECTORS["back_to_report_list"]),
+                 "Run report")
+            select_report_owner(page.locator("select").nth(0), "admin — Admin Systemu")
+            page.locator("select").nth(1).select_option(label="Raporty użytkownika")
+            ajax("run user's reports AJAX", page.locator(ACTION_SELECTORS["run_report"]),
+                 "Raporty przypisane użytkownikowi: admin")
+            assigned_rows = page.locator(".flow-report-table tbody tr")
+            check(assigned_rows.count() == 2 and "Profil użytkownika" in assigned_rows.nth(0).inner_text(),
+                  "user report shows only reports assigned to that user")
+            with page.expect_download(timeout=10_000) as assigned_download:
+                page.locator(ACTION_SELECTORS["download_report"]).click()
+            assigned_csv = pathlib.Path(assigned_download.value.path()).read_text(encoding="utf-8-sig")
+            assigned_headers = [header.inner_text().strip() for header in page.locator(".flow-report-table thead th").all()]
+            check("Profil użytkownika" in assigned_csv and "Raporty użytkownika" in assigned_csv
+                  and f'Notatka,"{note_text}"' in assigned_csv
+                  and ",".join(assigned_headers) in assigned_csv and "Notatka" not in assigned_headers,
+                  "assigned-report CSV matches table headers, rows and note")
+            ajax("return from user reports to report selection AJAX", page.locator(ACTION_SELECTORS["back_to_report_list"]),
+                 "Run report")
+            select_report_owner(page.locator("select").nth(0), "admin — Admin Systemu")
+            page.locator("select").nth(1).select_option(label="Profil użytkownika")
+            ajax("reopen report from report list AJAX", page.locator(ACTION_SELECTORS["run_report"]), "Raport użytkowników")
             ajax("finish report AJAX", page.locator(ACTION_SELECTORS["finish_report"]), "Użytkownicy")
 
             page.goto(base_url, wait_until="domcontentloaded")

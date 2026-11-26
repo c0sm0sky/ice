@@ -17,9 +17,14 @@ public final class MigrateJakartaToConfiguredServletVersion extends Recipe {
     private static final String FACES_41_MIGRATION =
             "org.openrewrite.java.migrate.jakarta.Faces4xMigrationToFaces41x";
 
+    @Option(displayName = "Migration phase",
+            description = "Use jakarta for the initial migration or faces-final after component conversion.",
+            example = "jakarta", required = false)
+    public String phase = "jakarta";
+
     @Option(displayName = "Wersja Jakarta Servlet",
             description = "Docelowa wersja jakarta.servlet-api odczytana z profilu migracyjnego.",
-            example = "6.1.0")
+            example = "6.1.0", required = false)
     public String servletVersion;
 
     @Option(displayName = "Migrate Jakarta Faces to 4.1",
@@ -42,6 +47,12 @@ public final class MigrateJakartaToConfiguredServletVersion extends Recipe {
         Environment environment = Environment.builder()
                 .scanRuntimeClasspath("org.openrewrite.java.migrate.jakarta")
                 .build();
+        if ("faces-final".equals(phase)) {
+            return List.of(environment.activateRecipes(FACES_41_MIGRATION));
+        }
+        if (!"jakarta".equals(phase)) {
+            throw new IllegalArgumentException("Unknown Jakarta migration phase: " + phase);
+        }
         List<Recipe> recipes = new ArrayList<>();
         // MyFaces 1.1 imports may have no attributed type, so update the package in the Java LST first.
         recipes.add(new ChangePackage("javax.faces", "jakarta.faces", true));
@@ -62,7 +73,7 @@ public final class MigrateJakartaToConfiguredServletVersion extends Recipe {
                         "http://java.sun.com/jsf/core", false),
                 new ChangeTagName("//*[local-name()='head']", "h:head"),
                 new ChangeTagName("//*[local-name()='body']", "h:body"),
-                new UpgradeWebXmlToServletVersion(servletVersion)));
+                new MigrateServletWebXml(servletVersion)));
         return recipes;
     }
 }

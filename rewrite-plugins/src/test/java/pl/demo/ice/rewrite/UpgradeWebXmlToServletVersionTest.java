@@ -48,8 +48,8 @@ class UpgradeWebXmlToServletVersionTest implements RewriteTest {
           """));
     }
 
-    private static UpgradeWebXmlToServletVersion recipe(String version) {
-        UpgradeWebXmlToServletVersion recipe = new UpgradeWebXmlToServletVersion();
+    private static MigrateServletWebXml recipe(String version) {
+        MigrateServletWebXml recipe = new MigrateServletWebXml();
         recipe.servletVersion = version;
         return recipe;
     }

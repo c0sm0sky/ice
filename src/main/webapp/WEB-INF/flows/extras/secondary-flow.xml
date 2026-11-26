@@ -42,6 +42,7 @@
   </action-state>
   <subflow-state id="showReport" flow="detail-flow">
     <transition on="finished" to="finish" />
+    <transition on="backToSelection" to="chooseReport" />
   </subflow-state>
   <view-state id="reportError" view="/extras/report-error.xhtml">
     <transition on="finish" to="finish" />

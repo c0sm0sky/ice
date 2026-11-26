@@ -127,6 +127,19 @@ public class FlowMigrationRuntimeTest extends AbstractXmlFlowExecutionTests {
         assertCurrentStateEquals("users");
     }
 
+    public void testReportResultCanReturnToReportSelection() throws Exception {
+        MockExternalContext context = startLoggedInFlow(new FakeUserOperations());
+        context = event(context, "openReport");
+        context = event(context, "run");
+        assertCurrentStateEquals("detail");
+        event(context, "back");
+        assertCurrentStateEquals("chooseReport");
+        context = event(context, "run");
+        assertCurrentStateEquals("detail");
+        event(context, "finish");
+        assertCurrentStateEquals("users");
+    }
+
     public void testReportFailureUsesErrorViewAndReturnsToUsers() throws Exception {
         MockExternalContext context = startLoggedInFlow(new FakeUserOperations());
         context = event(context, "openReport");

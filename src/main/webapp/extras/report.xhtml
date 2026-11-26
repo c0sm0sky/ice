@@ -1,7 +1,9 @@
 <ui:composition xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:f="http://java.sun.com/jsf/core"
                 xmlns:ui="http://java.sun.com/jsf/facelets"
                 xmlns:ice="http://www.icesoft.com/icefaces/component"
                 template="/WEB-INF/layouts/mainTemplate.xhtml">
+  <!--@elvariable id="reportBean" type="pl.demo.ice.extras.ReportBean"-->
   <ui:define name="title">Przepływ raportu</ui:define>
   <ui:define name="mainPanel">
     <main class="compatibility-page flow-page">
@@ -9,10 +11,26 @@
         <div>
           <p class="compatibility-eyebrow">Spring Web Flow</p>
           <h1>Raport</h1>
-          <p>Notatka zostaje zapisana w sesji, a zapis przechodzi przez akcję flow.</p>
+          <p>Wybierz definicję raportu i uruchom jej podgląd.</p>
         </div>
       </header>
       <section class="compatibility-card flow-card">
+        <h2>Dostępne raporty</h2>
+        <h2>Raport z bazy</h2>
+        <div class="flow-note-field">
+          <ice:outputLabel for="reportOwner" value="Użytkownik" />
+          <ice:selectOneMenu id="reportOwner" value="#{reportBean.selectedReportOwnerId}" partialSubmit="true">
+            <f:selectItems value="#{reportBean.availableReportOwners}" />
+          </ice:selectOneMenu>
+        </div>
+        <div class="flow-note-field">
+          <ice:outputLabel for="reportChoice" value="Raport użytkownika" />
+          <ice:selectOneMenu id="reportChoice" value="#{reportBean.selectedReportId}">
+            <f:selectItems value="#{reportBean.availableReports}" />
+          </ice:selectOneMenu>
+        </div>
+        <ice:outputText value="Właściciel: #{reportBean.selectedReportOwner}"
+                        rendered="#{reportBean.selectedReportOwner != ''}" styleClass="flow-status" />
         <h2>Notatka do raportu</h2>
         <div class="flow-note-field">
           <ice:outputLabel for="noteDraft" value="Treść notatki" />

@@ -97,17 +97,29 @@ class FlowMigrationDefinitionTest {
     @Test
     void supplementalFlowsKeepReportTransitionsAndResolveTheirViews() throws Exception {
         Element secondary = readFlow("extras/secondary-flow.xml");
+        NodeList cleanupActions = secondary.getElementsByTagNameNS(FLOW_NS, "evaluate");
+        boolean cleanupMethodInvoked = false;
+        for (int i = 0; i < cleanupActions.getLength(); i++) {
+            if ("reportBean.releaseResources()".equals(
+                    ((Element) cleanupActions.item(i)).getAttribute("expression"))) {
+                cleanupMethodInvoked = true;
+                break;
+            }
+        }
+        assertTrue(cleanupMethodInvoked, "the migrated flow must invoke report cleanup as a method");
         assertTransition(secondary, "chooseReport", "saveNote", "saveNote");
         assertTransition(secondary, "chooseReport", "run", "prepareReport");
         assertTransition(secondary, "chooseReport", "fail", "failReport");
         assertTransition(secondary, "chooseReport", "skip", "markUnavailable");
         assertTransition(secondary, "showReport", "finished", "finish");
+        assertTransition(secondary, "showReport", "backToSelection", "chooseReport");
         assertTransition(secondary, "reportError", "finish", "finish");
         assertEquals("detail-flow", state(secondary, "showReport").getAttribute("subflow"));
 
         Element detail = readFlow("extras/detail-flow.xml");
         assertEquals("detail", detail.getAttribute("start-state"));
         assertTransition(detail, "detail", "finish", "finished");
+        assertTransition(detail, "detail", "back", "backToSelection");
 
         for (String flowName : Arrays.asList("main-flow.xml", "extras/secondary-flow.xml", "extras/detail-flow.xml")) {
             NodeList views = readFlow(flowName).getElementsByTagNameNS(FLOW_NS, "view-state");
@@ -132,6 +144,16 @@ class FlowMigrationDefinitionTest {
         String userBean = Files.readString(Paths.get("primefaces-migrated/src/main/java/pl/demo/ice/UserBean.java"));
         assertFalse(userBean.contains("coverageLogin"), "component state must live outside UserBean");
         assertFalse(userBean.contains("reportNoteDraft"), "report state must live outside UserBean");
+    }
+
+    @Test
+    void spring7HibernateInfrastructureUsesSupportedClassNames() throws Exception {
+        String applicationContext = Files.readString(WEBAPP_DIR.resolve("WEB-INF/applicationContext.xml"));
+        assertTrue(applicationContext.contains("org.springframework.orm.jpa.hibernate.LocalSessionFactoryBean"));
+        assertTrue(applicationContext.contains("org.springframework.orm.jpa.hibernate.HibernateTransactionManager"));
+        assertTrue(applicationContext.contains("org.springframework.orm.jpa.hibernate.SpringSessionContext"));
+        assertFalse(applicationContext.contains("org.springframework.orm.hibernate5."),
+                "Spring ORM Hibernate 5 package must not remain in Spring 7 configuration");
     }
 
     @Test
